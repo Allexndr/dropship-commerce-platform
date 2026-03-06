@@ -6,9 +6,9 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     
-    # We will use SQLite for initial dev, then swap to PostGres
+    # Use /tmp for SQLite on Vercel serverless (ephemeral) or external DB via env var
     # To use postgres: "postgresql://user:password@localhost/dropship_db"
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./dropship.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:////tmp/dropship.db")
     
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-for-jwt-dev-only")
     ALGORITHM: str = "HS256"

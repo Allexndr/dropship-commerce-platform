@@ -1,16 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <title>Dropshipping Admin</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <title>Dropshipping Admin</title>
+</head>
+
+<body>
+  <script>
+    window.addEventListener('error', function (event) {
+      document.body.innerHTML += '<div style="position:fixed; top:0; left:0; width: 100%; padding: 20px; background: red; color: white; z-index: 9999; font-size: 20px;">Error: ' + event.message + '</div>';
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+      document.body.innerHTML += '<div style="position:fixed; top:50px; left:0; width: 100%; padding: 20px; background: red; color: white; z-index: 9999; font-size: 20px;">Promise Rejection: ' + (event.reason ? event.reason.message || event.reason : 'Unknown') + '</div>';
+    });
+    console.log("Global error handler injected.");
+  </script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>

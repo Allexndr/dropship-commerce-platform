@@ -33,6 +33,17 @@ for q in queries:
         })
     time.sleep(1) # Polite delay
 
+# Fallback items if search fails
+if not real_items:
+    print("Search failed or returned no results. Using fallback items.")
+    real_items = [
+        {"nm_id": 588950902, "name": "Зарядное устройство Breaking P-08 Type-C", "brand": "Breaking", "price_initial": 1282},
+        {"nm_id": 461551075, "name": "СЗУ USB Type-C 2 4A", "brand": "ISA", "price_initial": 503},
+        {"nm_id": 559256346, "name": "СЗУ USB Turbo Charger (67W QC3.0 кабель Type-C с чипом I)", "brand": "Promise mobile", "price_initial": 1204},
+        {"nm_id": 808908009, "name": "Зарядное устройство GAN 20W PD с кабелем USB-C – USB-C 3A", "brand": "TTEC", "price_initial": 3147},
+        {"nm_id": 808908010, "name": "Зарядник GAN 30W PD Travel Fast Charger USB-C 150cm", "brand": "TTEC", "price_initial": 3501}
+    ]
+
 # Limit to 10
 real_items = real_items[:10]
 

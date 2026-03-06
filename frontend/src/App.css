@@ -7,6 +7,9 @@
     --text-muted: #64748b;
     --border: #e2e8f0;
     --sidebar-w: 260px;
+    --sidebar-bg: #0f172a;
+    --sidebar-item: #94a3b8;
+    --sidebar-hover: rgba(255, 255, 255, 0.05);
     --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     font-family: 'Outfit', sans-serif;
@@ -68,11 +71,14 @@ input {
 /* Sidebar */
 .sidebar {
     width: var(--sidebar-w);
-    background: #0f172a;
+    background: var(--sidebar-bg);
     color: white;
     display: flex;
     flex-direction: column;
     padding: 1.5rem 1rem;
+    height: 100vh;
+    transition: transform 0.3s ease;
+    z-index: 1000;
 }
 
 .logo {
@@ -94,6 +100,7 @@ input {
     font-weight: 700;
     border-radius: 8px;
     font-size: 1.1rem;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
 }
 
 .logo-box.lg {
@@ -101,6 +108,7 @@ input {
     height: 60px;
     font-size: 1.8rem;
     margin-bottom: 1rem;
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
 .logo span {
@@ -122,13 +130,14 @@ input {
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     border-radius: 8px;
-    color: #94a3b8;
+    color: var(--sidebar-item);
     cursor: pointer;
     transition: all 0.2s;
+    font-weight: 500;
 }
 
 .nav-item:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--sidebar-hover);
     color: white;
 }
 
@@ -161,20 +170,38 @@ input {
 /* Main Container */
 .main-container {
     flex: 1;
-    display: flex;
     flex-direction: column;
     background: var(--bg-main);
 }
 
 .header {
-    height: 70px;
-    background: white;
+    height: 72px;
+    background: var(--bg-card);
     border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 2rem;
     flex-shrink: 0;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-main);
+    padding: 0.5rem;
+    border-radius: 8px;
+}
+
+.menu-toggle:hover {
+    background: var(--bg-main);
 }
 
 .header-info {
@@ -914,4 +941,116 @@ input {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
+}
+
+/* Sidebar premium refinements */
+.sidebar {
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.logo span {
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.nav-item {
+    margin: 0.125rem 0;
+}
+
+.nav-item.active {
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+/* Mobile responsiveness */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@media (max-width: 1024px) {
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        transform: translateX(-100%);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .menu-toggle {
+        display: flex;
+    }
+
+    .header {
+        padding: 0 1rem;
+    }
+
+    .card {
+        padding: 1rem;
+    }
+
+    .section-header h1 {
+        font-size: 1.5rem;
+    }
+
+    /* Table Responsiveness */
+    .table-card {
+        padding: 0;
+        overflow-x: auto;
+    }
+
+    .table th,
+    .table td {
+        white-space: nowrap;
+        padding: 0.75rem 1rem;
+    }
+
+    .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .actions-group {
+        flex-direction: column;
+    }
+
+    .filter-bar {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .header-info {
+        display: none;
+    }
+
+    .login-card {
+        width: 100%;
+        margin: 1rem;
+    }
+
+    .stat-grid {
+        grid-template-columns: 1fr;
+    }
 }

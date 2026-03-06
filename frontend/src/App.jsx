@@ -33,6 +33,7 @@ export default function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [editingProduct, setEditingProduct] = useState(null);
     const [userRole, setUserRole] = useState('admin');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const navItems = [
         { id: 'dashboard', label: 'Главная', icon: <LayoutDashboard size={20} />, roles: ['admin', 'manager'] },
@@ -78,8 +79,11 @@ export default function App() {
 
         return (
             <div className="layout">
+                {/* Sidebar Overlay (Mobile) */}
+                {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
+
                 {/* Sidebar */}
-                <aside className="sidebar">
+                <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
                     <div className="logo">
                         <div className="logo-box">DS</div>
                         <span>DropShift</span>
@@ -90,7 +94,11 @@ export default function App() {
                             <NavItem
                                 key={item.id}
                                 active={activeTab === item.id}
-                                onClick={() => { setActiveTab(item.id); setEditingProduct(null) }}
+                                onClick={() => {
+                                    setActiveTab(item.id);
+                                    setEditingProduct(null);
+                                    setIsSidebarOpen(false); // Close on selection on mobile
+                                }}
                                 icon={item.icon}
                                 label={item.label}
                             />
@@ -108,11 +116,16 @@ export default function App() {
                 {/* Main Container */}
                 <main className="main-container">
                     <header className="header">
-                        <div className="header-info">
-                            <h2 className="shop-name">NRT Store</h2>
-                            <div className="user-badge">
-                                <div className="online-indicator"></div>
-                                <span>{userRole.toUpperCase()}</span>
+                        <div className="header-left">
+                            <button className="menu-toggle" onClick={() => setIsSidebarOpen(true)}>
+                                <Menu size={24} />
+                            </button>
+                            <div className="header-info">
+                                <h2 className="shop-name">NRT Store</h2>
+                                <div className="user-badge">
+                                    <div className="online-indicator"></div>
+                                    <span>{userRole.toUpperCase()}</span>
+                                </div>
                             </div>
                         </div>
                         <div className="header-actions">
@@ -136,7 +149,7 @@ export default function App() {
 // Sub-components
 function NavItem({ active, icon, label, onClick }) {
     return (
-        <div className={`nav - item ${active ? 'active' : ''} `} onClick={onClick}>
+        <div className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}>
             {icon}
             <span>{label}</span>
         </div>

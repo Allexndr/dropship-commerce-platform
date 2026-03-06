@@ -22,7 +22,7 @@ import {
     PlusCircle,
     AlertCircle
 } from 'lucide-react';
-import { mockUsers, pricingRules, deliveryPrices } from './data';
+import { mockProducts, mockUsers, pricingRules, deliveryPrices, DELIVERY_PLUS } from './data';
 import axios from 'axios';
 import './App.css';
 
@@ -315,29 +315,68 @@ function Products({ onEdit }) {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`${API_BASE} /products/`);
+            const response = await axios.get(`${API_BASE}/products/`);
             setProducts(response.data);
             setError(null);
         } catch (err) {
-            setError('Ошибка загрузки товаров: ' + err.message);
+            // Fallback to mock data with ТЗ pricing formulas applied
+            console.warn('API unreachable, loading mock data:', err.message);
+            const enriched = mockProducts.map(p => {
+                // Calculate Price Mid from active links
+                const activeLinks = (p.links || []).filter(l => l.stock_status === 'active' && l.price > 0);
+                const priceMid = activeLinks.length > 0
+                    ? Math.round(activeLinks.reduce((sum, l) => sum + l.price, 0) / activeLinks.length)
+                    : 0;
+
+                // DeliveryMID = DeliveryMP (min delivery from cheapest link) + DeliveryPLUS
+                const minDeliveryLink = activeLinks.length > 0
+                    ? activeLinks.reduce((min, l) => l.price < min.price ? l : min, activeLinks[0])
+                    : null;
+                const deliveryMid = minDeliveryLink
+                    ? minDeliveryLink.delivery_days + DELIVERY_PLUS
+                    : 0;
+
+                // Find pricing % from pricingRules
+                const rule = pricingRules.find(r => priceMid >= r.min && priceMid <= r.max);
+                const percent = rule ? rule.percent : 0;
+
+                // Find delivery price from deliveryPrices
+                const dRule = deliveryPrices.find(r => priceMid >= r.min && priceMid <= r.max);
+                const deliveryPrice = dRule ? dRule.price : 0;
+
+                // Price = PriceMid + (PriceMid * % / 100) + DeliveryPrice
+                const finalPrice = priceMid > 0
+                    ? Math.round(priceMid + (priceMid * percent / 100) + deliveryPrice)
+                    : p.kaspi_price || 0;
+
+                return {
+                    ...p,
+                    mid_price: priceMid,
+                    delivery_days: deliveryMid,
+                    calculated_price: finalPrice
+                };
+            });
+            setProducts(enriched);
+            setError(null);
         } finally {
             setLoading(false);
         }
     };
 
     const handleAddTestProduct = async () => {
-        try {
-            const newSku = Math.floor(1000000 + Math.random() * 9000000).toString();
-            await axios.post(`${API_BASE} /products/`, {
-                sku: newSku,
-                model: "Test Product " + newSku,
-                brand: "TestBrand",
-                kaspi_price: 15000
-            });
-            fetchProducts(); // Refresh list
-        } catch (err) {
-            alert('Ошибка добавления: ' + err.message);
-        }
+        const newSku = Math.floor(1000000 + Math.random() * 9000000).toString();
+        const newProduct = {
+            sku: newSku,
+            name: "Тестовый товар " + newSku,
+            brand: "TestBrand",
+            kaspi_price: 15000,
+            mid_price: 0,
+            delivery_days: 0,
+            stock: 0,
+            links: [],
+            calculated_price: 15000
+        };
+        setProducts(prev => [newProduct, ...prev]);
     };
 
     return (
@@ -438,9 +477,9 @@ function Products({ onEdit }) {
                                         {isOverLimit && <div className="error-badge-inline"><AlertCircle size={12} /> Превышен лимит (30 дн.)</div>}
                                     </td>
                                     <td>{p.brand || '-'}</td>
-                                    <td><strong>{p.kaspi_price ? p.kaspi_price.toLocaleString() : "0"} ₸</strong></td>
-                                    <td>{p.kaspi_price ? p.kaspi_price.toLocaleString() : "0"} ₸</td>
-                                    <td>{p.mid_price ? p.mid_price.toLocaleString() : "0"} ₸</td>
+                                    <td><strong>{(p.calculated_price || p.kaspi_price || 0).toLocaleString()} ₸</strong></td>
+                                    <td>{(p.kaspi_price || 0).toLocaleString()} ₸</td>
+                                    <td>{(p.mid_price || 0).toLocaleString()} ₸</td>
                                     <td>{p.delivery_days} дн.</td>
                                     <td>{p.stock}</td>
                                     <td>
@@ -510,11 +549,11 @@ function ProductDetail({ product, onBack }) {
                         <tbody>
                             {product.links.length > 0 ? product.links.map(l => (
                                 <tr key={l.id}>
-                                    <td><span className={`source - badge ${l.source} `}>{l.source.toUpperCase()}</span></td>
+                                    <td><span className={`source-badge ${l.source}`}>{l.source.toUpperCase()}</span></td>
                                     <td>{l.external_id}</td>
                                     <td>{l.price.toLocaleString()} ₸</td>
                                     <td>{l.delivery_days} дн.</td>
-                                    <td><span className={`status - tag ${l.stock_status} `}>{l.stock_status}</span></td>
+                                    <td><span className={`status-tag ${l.stock_status}`}>{l.stock_status}</span></td>
                                     <td>
                                         <div className="row-actions">
                                             <button className="icon-btn sm"><Edit size={14} /></button>

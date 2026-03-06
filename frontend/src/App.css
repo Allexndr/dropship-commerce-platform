@@ -444,8 +444,31 @@ input {
     font-size: 0.9rem;
 }
 
-.data-table tr:hover {
+.data-table tr.row-base:hover {
     background: #f8fafc;
+}
+
+/* TZ Row Highlighting */
+.data-table tr.row-red {
+    background-color: rgba(244, 63, 94, 0.1);
+    /* light red */
+}
+
+.data-table tr.row-red:hover {
+    background-color: rgba(244, 63, 94, 0.15);
+}
+
+.data-table tr.row-yellow {
+    background-color: rgba(250, 204, 21, 0.1);
+    /* light yellow */
+}
+
+.data-table tr.row-yellow:hover {
+    background-color: rgba(250, 204, 21, 0.15);
+}
+
+.data-table tr.over-limit-row {
+    background-color: rgba(244, 63, 94, 0.2) !important;
 }
 
 .sku {
@@ -460,7 +483,9 @@ input {
     max-width: 300px;
 }
 
-.row-ok {}
+.row-ok {
+    background: transparent;
+}
 
 .row-warning {
     background: #fffcf0;
@@ -717,4 +742,176 @@ input {
 .row-actions {
     display: flex;
     gap: 0.5rem;
+}
+
+/* Source & Status Badges */
+.source-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.source-badge.wb {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.source-badge.ozon {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-tag {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-tag.active {
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.status-tag.error {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.status-tag.out_of_stock {
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+/* Readonly Input */
+.readonly-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.readonly-input input {
+    background: transparent;
+    border: none;
+    flex: 1;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.readonly-input a {
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+}
+
+/* Alert Boxes */
+.alert-error {
+    background: #fef2f2;
+    border-left: 4px solid #f43f5e;
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: #991b1b;
+}
+
+.alert-error strong {
+    font-weight: 700;
+}
+
+.role-badge {
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.quick-login-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quick-login-title {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.role-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.5rem;
+}
+
+.role-btn {
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.role-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.role-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.alert-box.success {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.credential-hint {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.credential-hint code {
+    color: var(--primary);
+    background: rgba(0, 201, 142, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.rules-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.detail-info-card .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
 }

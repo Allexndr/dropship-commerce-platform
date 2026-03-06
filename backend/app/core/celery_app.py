@@ -21,3 +21,13 @@ celery_app.conf.update(
     # Rate limits to avoid banning
     task_default_rate_limit='1/s',
 )
+
+# Scheduled tasks
+from celery.schedules import crontab
+
+celery_app.conf.beat_schedule = {
+    'update-all-links-every-3-hours': {
+        'task': 'app.services.tasks.trigger_all_active_links_update',
+        'schedule': crontab(minute=0, hour='*/3'),
+    },
+}

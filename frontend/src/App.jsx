@@ -32,8 +32,18 @@ export default function App() {
     const [isLogged, setIsLogged] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard');
     const [editingProduct, setEditingProduct] = useState(null);
+    const [userRole, setUserRole] = useState('admin');
 
-    console.log('App Rendering - isLogged:', isLogged, 'activeTab:', activeTab);
+    const navItems = [
+        { id: 'dashboard', label: 'Главная', icon: <LayoutDashboard size={20} />, roles: ['admin', 'manager'] },
+        { id: 'products', label: 'Товары', icon: <Box size={20} />, roles: ['admin', 'manager', 'praiser'] },
+        { id: 'shop', label: 'Магазин', icon: <ShoppingBag size={20} />, roles: ['admin', 'manager', 'seller'] },
+        { id: 'analytics', label: 'Аналитика', icon: <BarChart3 size={20} />, roles: ['admin', 'manager', 'analytic'] },
+        { id: 'users', label: 'Пользователи', icon: <Users size={20} />, roles: ['admin', 'manager'] },
+        { id: 'profile', label: 'Профиль', icon: <User size={20} />, roles: ['admin', 'manager'] },
+    ];
+
+    const allowedTabs = navItems.filter(item => item.roles.includes(userRole));
 
     try {
         const renderContent = () => {
@@ -48,12 +58,22 @@ export default function App() {
                 case 'analytics': return <Placeholder title="Аналитика" icon={<BarChart3 size={48} />} />;
                 case 'users': return <UsersTable />;
                 case 'profile': return <Profile />;
-                default: return <Dashboard />;
+                default:
+                    const firstTab = allowedTabs[0]?.id || 'dashboard';
+                    return activeTab === firstTab ? <Dashboard /> : <Dashboard />; // Fallback
             }
         };
 
         if (!isLogged) {
-            return <LoginPage onLogin={() => setIsLogged(true)} />;
+            return <LoginPage onLogin={(role) => {
+                setIsLogged(true);
+                if (role) {
+                    setUserRole(role);
+                    // Redirect to first allowed tab for this role
+                    const roleTabs = navItems.filter(item => item.roles.includes(role));
+                    if (roleTabs.length > 0) setActiveTab(roleTabs[0].id);
+                }
+            }} />;
         }
 
         return (
@@ -66,12 +86,15 @@ export default function App() {
                     </div>
 
                     <nav className="nav">
-                        <NavItem active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setEditingProduct(null) }} icon={<LayoutDashboard size={20} />} label="Главная" />
-                        <NavItem active={activeTab === 'products'} onClick={() => { setActiveTab('products'); setEditingProduct(null) }} icon={<Box size={20} />} label="Товары" />
-                        <NavItem active={activeTab === 'shop'} onClick={() => { setActiveTab('shop'); setEditingProduct(null) }} icon={<ShoppingBag size={20} />} label="Магазин" />
-                        <NavItem active={activeTab === 'analytics'} onClick={() => { setActiveTab('analytics'); setEditingProduct(null) }} icon={<BarChart3 size={20} />} label="Аналитика" />
-                        <NavItem active={activeTab === 'users'} onClick={() => { setActiveTab('users'); setEditingProduct(null) }} icon={<Users size={20} />} label="Пользователи" />
-                        <NavItem active={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); setEditingProduct(null) }} icon={<User size={20} />} label="Профиль" />
+                        {allowedTabs.map(item => (
+                            <NavItem
+                                key={item.id}
+                                active={activeTab === item.id}
+                                onClick={() => { setActiveTab(item.id); setEditingProduct(null) }}
+                                icon={item.icon}
+                                label={item.label}
+                            />
+                        ))}
                     </nav>
 
                     <div className="sidebar-footer">
@@ -89,7 +112,7 @@ export default function App() {
                             <h2 className="shop-name">NRT Store</h2>
                             <div className="user-badge">
                                 <div className="online-indicator"></div>
-                                <span>Admin</span>
+                                <span>{userRole.toUpperCase()}</span>
                             </div>
                         </div>
                         <div className="header-actions">
@@ -113,7 +136,7 @@ export default function App() {
 // Sub-components
 function NavItem({ active, icon, label, onClick }) {
     return (
-        <div className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}>
+        <div className={`nav - item ${active ? 'active' : ''} `} onClick={onClick}>
             {icon}
             <span>{label}</span>
         </div>
@@ -121,6 +144,66 @@ function NavItem({ active, icon, label, onClick }) {
 }
 
 function LoginPage({ onLogin }) {
+    const [forgotMode, setForgotMode] = useState(false);
+    const [email, setEmail] = useState('admin@nrt.kz');
+    const [password, setPassword] = useState('12345678');
+    const [status, setStatus] = useState('');
+    const [selectedRole, setSelectedRole] = useState('admin');
+
+    const handleForgot = async (e) => {
+        e.preventDefault();
+        try {
+            await axios.post(`${API_BASE}/users/reset-password?email=${email}`);
+            setStatus(`Инструкция по сбросу отправлена на ${email}`);
+        } catch (err) {
+            setStatus('Ошибка. Проверьте Email.');
+        }
+    };
+
+    const roles = [
+        { id: 'admin', label: 'Админ', email: 'admin@nrt.kz' },
+        { id: 'manager', label: 'Менеджер', email: 'manager@nrt.kz' },
+        { id: 'praiser', label: 'Оценщик', email: 'praiser@nrt.kz' },
+        { id: 'seller', label: 'Продавец', email: 'seller@nrt.kz' },
+        { id: 'analytic', label: 'Аналитик', email: 'analytic@nrt.kz' },
+    ];
+
+    const quickLogin = (role) => {
+        setEmail(role.email);
+        setPassword('12345678');
+        setSelectedRole(role.id);
+        // Optionally auto-login
+        // onLogin(role.id);
+    };
+
+    if (forgotMode) {
+        return (
+            <div className="login-screen">
+                <div className="login-card glass">
+                    <div className="login-header">
+                        <h1>Восстановление</h1>
+                        <p>Введите ваш email для сброса пароля</p>
+                    </div>
+                    {status ? (
+                        <div className="alert-box success mt">
+                            <p>{status}</p>
+                            <button className="btn-secondary full mt" onClick={() => { setForgotMode(false); setStatus(''); }}>Вернуться</button>
+                        </div>
+                    ) : (
+                        <form className="login-form" onSubmit={handleForgot}>
+                            <div className="form-group">
+                                <label>Email</label>
+                                <input type="email" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                            </div>
+                            <button type="submit" className="btn-primary full">Сбросить пароль</button>
+                            <button type="button" className="btn-link" onClick={() => setForgotMode(false)}>Вернуться ко входу</button>
+                        </form>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="login-screen">
             <div className="login-card glass">
@@ -129,17 +212,38 @@ function LoginPage({ onLogin }) {
                     <h1>Дропшиппинг</h1>
                     <p>Вход в систему управления</p>
                 </div>
-                <form className="login-form" onSubmit={(e) => { e.preventDefault(); onLogin(); }}>
+
+                <div className="quick-login-section">
+                    <p className="quick-login-title">Войти как:</p>
+                    <div className="role-buttons">
+                        {roles.map(role => (
+                            <button
+                                key={role.id}
+                                type="button"
+                                className={`role-btn ${selectedRole === role.id ? 'active' : ''}`}
+                                onClick={() => quickLogin(role)}
+                            >
+                                {role.label}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="credential-hint mt">
+                        <strong>Логин:</strong> <code>{roles.find(r => r.id === selectedRole)?.email}</code><br />
+                        <strong>Пароль:</strong> <code>12345678</code>
+                    </div>
+                </div>
+
+                <form className="login-form" onSubmit={(e) => { e.preventDefault(); onLogin(selectedRole); }}>
                     <div className="form-group">
                         <label>Email</label>
-                        <input type="email" placeholder="email@example.com" defaultValue="admin@nrt.kz" />
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
                     </div>
                     <div className="form-group">
                         <label>Пароль</label>
-                        <input type="password" placeholder="••••••••" defaultValue="12345678" />
+                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     </div>
                     <button type="submit" className="btn-primary full">Войти</button>
-                    <button type="button" className="btn-link">Забыли пароль?</button>
+                    <button type="button" className="btn-link" onClick={() => setForgotMode(true)}>Забыли пароль?</button>
                 </form>
             </div>
         </div>
@@ -147,17 +251,17 @@ function LoginPage({ onLogin }) {
 }
 
 function Dashboard() {
-    const xmlUrl = "https://nrt-store.kz/api/kaspi/xml?token=fvblMh3EkBCHhR...";
+    const xmlUrl = `${window.location.origin} /api/v1 / kaspi / xml ? token = fvblMh3EkBCHhR1AD...`;
     return (
         <div className="page-content">
             <div className="section-header">
                 <h1>Главная</h1>
-                <p>XML-фид для Kaspi магазина</p>
+                <p>XML-фид для автоматической загрузки Kaspi</p>
             </div>
 
             <div className="card xml-card">
                 <div className="xml-header">
-                    <div className="xml-badge">XML FEED</div>
+                    <div className="xml-badge">XML FEED KASPI</div>
                     <button className="btn-secondary sm" onClick={() => navigator.clipboard.writeText(xmlUrl)}>
                         <Copy size={16} /> Копировать ссылку
                     </button>
@@ -177,6 +281,10 @@ function Dashboard() {
                         <strong>Последнее обновление:</strong> 12 мин. назад
                     </div>
                 </div>
+                <div className="xml-info mt">
+                    <p><AlertCircle size={14} /> Используйте эту ссылку в личном кабинете Kaspi Pay для автоматического обновления цен.</p>
+                    <a href="https://guide.kaspi.kz/partner/ru/shop/goods/price_list/q3251" target="_blank" rel="noreferrer" className="btn-link">Инструкция Kaspi <ExternalLink size={14} /></a>
+                </div>
             </div>
         </div>
     );
@@ -194,7 +302,7 @@ function Products({ onEdit }) {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`${API_BASE}/products/`);
+            const response = await axios.get(`${API_BASE} /products/`);
             setProducts(response.data);
             setError(null);
         } catch (err) {
@@ -207,7 +315,7 @@ function Products({ onEdit }) {
     const handleAddTestProduct = async () => {
         try {
             const newSku = Math.floor(1000000 + Math.random() * 9000000).toString();
-            await axios.post(`${API_BASE}/products/`, {
+            await axios.post(`${API_BASE} /products/`, {
                 sku: newSku,
                 model: "Test Product " + newSku,
                 brand: "TestBrand",
@@ -227,8 +335,15 @@ function Products({ onEdit }) {
                     <p>Управление прайс-листом и ценообразованием</p>
                 </div>
                 <div className="actions-group">
-                    <button className="btn-secondary"><Download size={18} /> Шаблон</button>
-                    <button className="btn-secondary"><Upload size={18} /> Импорт EXCEL</button>
+                    <button className="btn-secondary" onClick={() => alert('Загрузка шаблона Excel...')}>
+                        <Download size={18} /> Шаблон
+                    </button>
+                    <button className="btn-secondary" onClick={() => {
+                        const err = document.getElementById('import-error');
+                        if (err) err.style.display = err.style.display === 'none' ? 'block' : 'none';
+                    }}>
+                        <Upload size={18} /> Импорт EXCEL
+                    </button>
                     <button className="btn-primary" onClick={handleAddTestProduct}><PlusCircle size={18} /> Добавить тест-товар</button>
                     <button className="btn-secondary" onClick={fetchProducts}><RefreshCcw size={18} /></button>
                 </div>
@@ -255,6 +370,18 @@ function Products({ onEdit }) {
                 </div>
             </div>
 
+            {/* Excel Import Simulation Error */}
+            <div className="import-status-box" style={{ marginBottom: '1rem', display: 'none' }} id="import-error">
+                <div className="alert-error">
+                    <AlertCircle size={18} />
+                    <div>
+                        <strong>Ошибка импорта:</strong> Весь файл отклонен. Исправьте ошибки:<br />
+                        • строка 57: ссылка не правильная (КАСПИ)<br />
+                        • строка 98: повтор SKU (уже существует)
+                    </div>
+                </div>
+            </div>
+
             <div className="card table-card overflow-x">
                 <table className="data-table">
                     <thead>
@@ -262,11 +389,11 @@ function Products({ onEdit }) {
                             <th>SKU</th>
                             <th>Наименование</th>
                             <th>Бренд</th>
-                            <th>Цена</th>
+                            <th>Цена (=Price)</th>
                             <th>Price Kaspi</th>
-                            <th>Price Mid</th>
-                            <th>Доставка</th>
-                            <th>Кол-во</th>
+                            <th>Price MID</th>
+                            <th>Доставка (DeliveryMID)</th>
+                            <th>Кол-во (stock)</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -277,27 +404,34 @@ function Products({ onEdit }) {
                             <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>Товаров пока нет. Добавьте первый тестовый товар.</td></tr>
                         )}
                         {!loading && !error && products.map(p => {
-                            // Calculate metrics based on WB links (mock logic for now if no links)
-                            const bestLink = p.links && p.links.length > 0 ? p.links[0] : null;
-                            const currentDelivery = bestLink ? bestLink.delivery_days : 0;
-                            const isOverLimit = (currentDelivery + 3) > 30; // 3 is Default DeliveryPLUS
-                            const displayPrice = p.kaspi_price || 0;
+                            // Highlighting Logic
+                            let rowClass = "row-base";
+                            if (!p.links || p.links.length === 0) {
+                                rowClass = "row-red"; // No links
+                            } else {
+                                const hasError = p.links.some(l => l.stock_status === 'error' || l.price === 0);
+                                if (hasError) {
+                                    rowClass = "row-yellow"; // Has errors
+                                }
+                            }
+
+                            const isOverLimit = p.delivery_days > 30; // Just as an example limit alert
 
                             return (
-                                <tr key={p.sku} className={`row-${p.status} ${isOverLimit ? 'over-limit-row' : ''}`}>
+                                <tr key={p.sku} className={`${rowClass} ${isOverLimit ? 'over-limit-row' : ''} `} onDoubleClick={() => onEdit(p)}>
                                     <td><code className="sku">{p.sku}</code></td>
                                     <td>
-                                        <div className="model-name">{p.model}</div>
+                                        <div className="model-name">{p.name}</div>
                                         {isOverLimit && <div className="error-badge-inline"><AlertCircle size={12} /> Превышен лимит (30 дн.)</div>}
                                     </td>
                                     <td>{p.brand || '-'}</td>
-                                    <td><strong>{bestLink ? bestLink.price.toLocaleString() : displayPrice.toLocaleString()} ₸</strong></td>
-                                    <td>{displayPrice.toLocaleString()} ₸</td>
-                                    <td>-</td>
-                                    <td>{currentDelivery} дн.</td>
-                                    <td>{bestLink ? bestLink.quantity : '-'}</td>
+                                    <td><strong>{p.kaspi_price ? p.kaspi_price.toLocaleString() : "0"} ₸</strong></td>
+                                    <td>{p.kaspi_price ? p.kaspi_price.toLocaleString() : "0"} ₸</td>
+                                    <td>{p.mid_price ? p.mid_price.toLocaleString() : "0"} ₸</td>
+                                    <td>{p.delivery_days} дн.</td>
+                                    <td>{p.stock}</td>
                                     <td>
-                                        <button className="edit-row-btn" onClick={() => onEdit(p)}>
+                                        <button className="edit-row-btn" onClick={() => onEdit(p)} title="Редактировать">
                                             <Edit size={16} />
                                         </button>
                                     </td>
@@ -325,14 +459,18 @@ function ProductDetail({ product, onBack }) {
                     <div className="info-grid">
                         <div className="info-item"><label>SKU</label><span>{product.sku || '-'}</span></div>
                         <div className="info-item"><label>Бренд</label><span>{product.brand || '-'}</span></div>
-                        <div className="info-item"><label>Модель</label><span>{product.model || '-'}</span></div>
+                        <div className="info-item"><label>Наименование</label><span>{product.name || '-'}</span></div>
                         <div className="info-item">
                             <label>Мин. цена Kaspi</label>
                             <span className="price-tag">{(product.kaspi_price || 0).toLocaleString()} ₸</span>
                         </div>
                     </div>
                     <div className="external-link-box">
-                        <a href="https://kaspi.kz/shop/..." target="_blank" rel="noreferrer">Посмотреть на Kaspi <ExternalLink size={14} /></a>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Ссылка Kaspi:</label>
+                        <div className="readonly-input">
+                            <input type="text" value={product.kaspi_link || 'https://kaspi.kz/shop/p/...'} readOnly />
+                            <a href={product.kaspi_link || '#'} target="_blank" rel="noreferrer"><ExternalLink size={14} /></a>
+                        </div>
                     </div>
                 </div>
 
@@ -348,20 +486,22 @@ function ProductDetail({ product, onBack }) {
                     <table className="links-table">
                         <thead>
                             <tr>
-                                <th>Артикул</th>
-                                <th>Название на MP</th>
+                                <th>Источник</th>
+                                <th>ID на MP</th>
                                 <th>Цена MP</th>
                                 <th>Срок</th>
+                                <th>Статус</th>
                                 <th>Действие</th>
                             </tr>
                         </thead>
                         <tbody>
                             {product.links.length > 0 ? product.links.map(l => (
                                 <tr key={l.id}>
-                                    <td>{l.art}</td>
-                                    <td>{l.name}</td>
+                                    <td><span className={`source - badge ${l.source} `}>{l.source.toUpperCase()}</span></td>
+                                    <td>{l.external_id}</td>
                                     <td>{l.price.toLocaleString()} ₸</td>
-                                    <td>{l.delivery} дн.</td>
+                                    <td>{l.delivery_days} дн.</td>
+                                    <td><span className={`status - tag ${l.stock_status} `}>{l.stock_status}</span></td>
                                     <td>
                                         <div className="row-actions">
                                             <button className="icon-btn sm"><Edit size={14} /></button>
@@ -371,7 +511,7 @@ function ProductDetail({ product, onBack }) {
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="5" className="empty-row">Ссылок пока нет. Добавьте первую.</td>
+                                    <td colSpan="6" className="empty-row">Ссылок пока нет. Добавьте первую.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -383,14 +523,26 @@ function ProductDetail({ product, onBack }) {
 }
 
 function UsersTable() {
+    // Admin, Manager, Praiser, Seller, Analytic
+    const [usersList, setUsersList] = useState([
+        { id: 1, login: 'admin@nrt.kz', shop: 'Все', role: 'admin' },
+        { id: 2, login: 'manager@nrt.kz', shop: 'NRT Store', role: 'manager' },
+        { id: 3, login: 'praiser@nrt.kz', shop: 'NRT Store', role: 'praiser' },
+        { id: 4, login: 'seller@nrt.kz', shop: 'NRT Store', role: 'seller' },
+        { id: 5, login: 'analytic@nrt.kz', shop: 'NRT Store', role: 'analytic' }
+    ]);
+
     return (
         <div className="page-content">
             <div className="section-header-flex">
                 <div>
                     <h1>Пользователи</h1>
-                    <p>Управление правами доступа сотрудников</p>
+                    <p>Управление правами доступа (admin, manager, praiser, seller, analytic)</p>
                 </div>
-                <button className="btn-primary"><PlusCircle size={18} /> Новый пользователь</button>
+                <button className="btn-primary" onClick={() => {
+                    const nu = { id: Date.now(), login: 'new_user@nrt.kz', shop: 'NRT Store', role: 'manager' };
+                    setUsersList([...usersList, nu]);
+                }}><PlusCircle size={18} /> Новый пользователь</button>
             </div>
 
             <div className="card table-card">
@@ -399,22 +551,16 @@ function UsersTable() {
                         <tr>
                             <th>User Login</th>
                             <th>Shop</th>
-                            <th>Manager</th>
-                            <th>Praiser</th>
-                            <th>Seller</th>
-                            <th>Analytic</th>
+                            <th>Role</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        {mockUsers.map(u => (
+                        {usersList.map(u => (
                             <tr key={u.id}>
                                 <td>{u.login}</td>
                                 <td><span className="badge-shop">{u.shop}</span></td>
-                                <td><input type="checkbox" checked={u.manager} readOnly /></td>
-                                <td><input type="checkbox" checked={u.praiser} readOnly /></td>
-                                <td><input type="checkbox" checked={u.seller} readOnly /></td>
-                                <td><input type="checkbox" checked={u.analytic} readOnly /></td>
+                                <td><span className="role-badge">{u.role}</span></td>
                                 <td><div className="row-actions"><button className="icon-btn sm"><Edit size={14} /></button><button className="icon-btn sm red"><Trash2 size={14} /></button></div></td>
                             </tr>
                         ))}
@@ -430,7 +576,7 @@ function Profile() {
         <div className="page-content">
             <div className="section-header">
                 <h1>Профиль магазина</h1>
-                <p>Настройки API и алгоритма ценообразования</p>
+                <p>Настройки API и алгоритма ценообразования (по ТЗ)</p>
             </div>
 
             <div className="profile-grid">
@@ -439,49 +585,30 @@ function Profile() {
                     <div className="info-list">
                         <div className="info-row"><label>Shop Name:</label> <span>NRT Store</span></div>
                         <div className="info-row"><label>Shop ID:</label> <span>16493269</span></div>
-                        <div className="info-row"><label>Region:</label> <span className="region-tag">Almaty</span></div>
                         <div className="info-row"><label>API Key:</label> <span className="api-key-mask">fvblMh3EkBCHhR1AD...</span></div>
                     </div>
-                    <button className="btn-secondary sm">Редактировать профиль</button>
+                    <button className="btn-secondary mt">Сменить пароль</button>
                 </div>
 
-                <div className="card pricing-settings">
-                    <div className="card-header-flex">
-                        <h3>Процент надбавки</h3>
-                        <button className="btn-primary sm"><Edit size={14} /> Изменить</button>
-                    </div>
-                    <table className="settings-table">
-                        <thead>
-                            <tr><th>Sum Min</th><th>Sum Max</th><th>%</th></tr>
-                        </thead>
-                        <tbody>
-                            {pricingRules.map((r, i) => (
-                                <tr key={i}><td>{r.min} ₸</td><td>{r.max.toLocaleString()} ₸</td><td><strong>{r.percent}%</strong></td></tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div className="card delivery-settings">
-                    <div className="card-header-flex">
-                        <h3>Стоимость доставки</h3>
-                        <button className="btn-secondary sm"><Edit size={14} /> Изменить</button>
-                    </div>
-                    <table className="settings-table">
-                        <thead>
-                            <tr><th>Sum Min</th><th>Sum Max</th><th>Price</th></tr>
-                        </thead>
-                        <tbody>
-                            {deliveryPrices.map((d, i) => (
-                                <tr key={i}><td>{d.min} ₸</td><td>{d.max.toLocaleString()} ₸</td><td>{d.price} ₸</td></tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    <div className="delivery-plus card mini mt">
-                        <div className="flex-between">
-                            <span><strong>DeliveryPLUS:</strong> 3 дня</span>
-                            <button className="icon-btn sm"><Edit size={14} /></button>
+                <div className="card pricing-rules">
+                    <h3>Ценообразование магазина</h3>
+                    <div className="rules-form">
+                        <div className="form-group">
+                            <label>ПРОЦЕНТ надбавки (%)</label>
+                            <input type="number" defaultValue={20} />
+                            <small>Процент, который добавляется к цене себестоимости.</small>
                         </div>
+                        <div className="form-group">
+                            <label>Delivery PLUS (дни)</label>
+                            <input type="number" defaultValue={3} />
+                            <small>Дополнительное число к прибавлению к дате доставке.</small>
+                        </div>
+                        <div className="form-group">
+                            <label>Delivery Price (₸)</label>
+                            <input type="number" defaultValue={1500} />
+                            <small>Сумма доставки за единицу товара.</small>
+                        </div>
+                        <button className="btn-primary" style={{ width: 'fit-content' }}>Сохранить настройки</button>
                     </div>
                 </div>
             </div>

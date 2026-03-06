@@ -5,6 +5,7 @@ from typing import List
 from app.core.database import get_db
 from app.models.product import Product
 from app.models.wblink import WbLink
+from app.models.shop import Shop
 from app.schemas.product import ProductCreate, ProductResponse, WbLinkCreate, WbLinkResponse
 
 router = APIRouter()
@@ -12,6 +13,10 @@ router = APIRouter()
 @router.get("/", response_model=List[ProductResponse])
 def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     products = db.query(Product).offset(skip).limit(limit).all()
+    # Temporarily we will pull shop settings dynamically if needed, 
+    # but for now we just return the raw product records. 
+    # The actual calculation of Price = PriceMid + (PriceMid * %) + DeliveryPrice
+    # will be done by the frontend or by the background Celery task that updates products.
     return products
 
 @router.post("/", response_model=ProductResponse)

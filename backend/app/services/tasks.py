@@ -24,7 +24,7 @@ def update_wblink_data(self, link_id: int):
         result = parser.get_product_info(int(link.external_id))
         
         if result['status'] == 'success':
-            # Update the database record
+            # Update the database record for the link
             if result['price'] > 0:
                 link.price = result['price']
             
@@ -32,6 +32,32 @@ def update_wblink_data(self, link_id: int):
             link.stock_status = result['stock_status']
             link.quantity = result['quantity']
             link.last_parsed_at = datetime.utcnow()
+            
+            # Recalculate Product formulas based on all links
+            product = db.query(Product).filter(Product.sku == link.product_sku).first()
+            if product:
+                active_links = [l for l in product.links if l.price > 0 and l.stock_status != 'error'] # simplified logic for active
+                if active_links:
+                    product.mid_price = sum(l.price for l in active_links) / len(active_links)
+                    
+                    # DeliveryMID = preorder (срок доставки ВБ/Озон) + DeliveryPLUS
+                    max_delivery_mp = max(l.delivery_days for l in active_links)
+                    
+                    # If product belongs to a shop, calculate final Kaspi price and delivery days
+                    if product.shop:
+                        # DeliveryMID = DeliveryMP + DeliveryPLUS
+                        delivery_plus = product.shop.delivery_plus if product.shop.delivery_plus else 0
+                        product.delivery_days = max_delivery_mp + delivery_plus
+                        
+                        # Price = PriceMid + (PriceMid * ПРОЦЕНТ) + Delivery Price
+                        markup_percent = product.shop.percent_markup / 100.0 if product.shop.percent_markup else 0.0
+                        delivery_price = product.shop.delivery_price if product.shop.delivery_price else 0.0
+                        
+                        product.kaspi_price = product.mid_price + (product.mid_price * markup_percent) + delivery_price
+                    else:
+                        # Fallback if no shop assigned
+                        product.delivery_days = max_delivery_mp
+                        product.kaspi_price = product.mid_price
             
             db.commit()
             return f"Successfully updated Link {link_id} (NM: {link.external_id})"

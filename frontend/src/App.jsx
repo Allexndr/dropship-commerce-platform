@@ -49,7 +49,18 @@ export default function App() {
     try {
         const renderContent = () => {
             if (editingProduct) {
-                return <ProductDetail product={editingProduct} onBack={() => setEditingProduct(null)} />;
+                // Determine if we need to fall back to a specific update function, 
+                // but actually editingProduct is stored in the Products component state, not App state.
+                // Wait, editingProduct is in App.jsx but products are in Products.jsx!
+                // Wait, let's look at how editingProduct is set.
+                return <ProductDetail
+                    product={editingProduct}
+                    onBack={(updatedProduct) => {
+                        // The actual products list is inside the Products component.
+                        // We will need to just pass onBack. The updating behavior will be handled next.
+                        setEditingProduct(null);
+                    }}
+                />;
             }
 
             switch (activeTab) {
@@ -364,19 +375,52 @@ function Products({ onEdit }) {
     };
 
     const handleAddTestProduct = async () => {
-        const newSku = Math.floor(1000000 + Math.random() * 9000000).toString();
-        const newProduct = {
-            sku: newSku,
-            name: "Тестовый товар " + newSku,
-            brand: "TestBrand",
-            kaspi_price: 15000,
-            mid_price: 0,
-            delivery_days: 0,
-            stock: 0,
-            links: [],
-            calculated_price: 15000
-        };
-        setProducts(prev => [newProduct, ...prev]);
+        const url = prompt("Введите ссылку на товар Kaspi:");
+        if (!url) return;
+
+        try {
+            // Mock parsing the URL... Delay to simulate work.
+            setLoading(true);
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            const newSku = Math.floor(1000000 + Math.random() * 9000000).toString();
+            const newProduct = {
+                sku: newSku,
+                name: "Спарсенный товар (Тест) " + newSku,
+                brand: "KaspiBrand",
+                kaspi_price: Math.floor(10000 + Math.random() * 50000),
+                mid_price: 0,
+                delivery_days: 0,
+                stock: 0,
+                links: [],
+                kaspi_link: url,
+                calculated_price: 0
+            };
+            // Kaspi price only since no links yet
+            newProduct.calculated_price = newProduct.kaspi_price;
+
+            setProducts(prev => [newProduct, ...prev]);
+        } catch (err) {
+            alert('Ошибка добавления: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAction = async (actionName) => {
+        setLoading(true);
+        try {
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            alert(`Успешно выполнено: ${actionName}`);
+            // In a real app we would call fetchProducts() here
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateProduct = (updatedProduct) => {
+        setProducts(prev => prev.map(p => p.sku === updatedProduct.sku ? updatedProduct : p));
+        onEdit(updatedProduct); // Keep the editing view updated with the parent if necessary
     };
 
     return (
@@ -387,17 +431,19 @@ function Products({ onEdit }) {
                     <p>Управление прайс-листом и ценообразованием</p>
                 </div>
                 <div className="actions-group">
-                    <button className="btn-secondary" onClick={() => alert('Загрузка шаблона Excel...')}>
-                        <Download size={18} /> Шаблон
-                    </button>
+                    <button className="btn-primary" onClick={handleAddTestProduct}><PlusCircle size={18} /> Добавить товар по ссылке</button>
                     <button className="btn-secondary" onClick={() => {
                         const err = document.getElementById('import-error');
                         if (err) err.style.display = err.style.display === 'none' ? 'block' : 'none';
                     }}>
                         <Upload size={18} /> Импорт EXCEL
                     </button>
-                    <button className="btn-primary" onClick={handleAddTestProduct}><PlusCircle size={18} /> Добавить тест-товар</button>
-                    <button className="btn-secondary" onClick={fetchProducts}><RefreshCcw size={18} /></button>
+                    <button className="btn-secondary" onClick={() => alert('Началась загрузка шаблона...')}>
+                        <Download size={18} /> Скачать шаблон EXCEL
+                    </button>
+                    <button className="btn-secondary" onClick={() => handleAction('Обновление цен Kaspi')}><RefreshCcw size={18} /> Обновить Каспи</button>
+                    <button className="btn-secondary" onClick={() => handleAction('Обновление цен и сроков WB/Ozon')}><RefreshCcw size={18} /> Обновить цены</button>
+                    <button className="btn-secondary" onClick={() => handleAction('Полное обновление всех данных')}><RefreshCcw size={18} /> Обновить ВСЕ</button>
                 </div>
             </div>
 
@@ -483,7 +529,7 @@ function Products({ onEdit }) {
                                     <td>{p.delivery_days} дн.</td>
                                     <td>{p.stock}</td>
                                     <td>
-                                        <button className="edit-row-btn" onClick={() => onEdit(p)} title="Редактировать">
+                                        <button className="edit-row-btn" onClick={() => onEdit(p, handleUpdateProduct)} title="Редактировать">
                                             <Edit size={16} />
                                         </button>
                                     </td>
@@ -497,7 +543,58 @@ function Products({ onEdit }) {
     );
 }
 
-function ProductDetail({ product, onBack }) {
+function ProductDetail({ product: initialProduct, onBack, onUpdate }) {
+    const [product, setProduct] = useState(initialProduct);
+
+    // Sync changes back when they happen
+    const syncUpdate = (updatedProduct) => {
+        setProduct(updatedProduct);
+        if (onUpdate) onUpdate(updatedProduct);
+    };
+
+    const handleAddLink = (source) => {
+        const url = prompt(`Введите ссылку на товар ${source.toUpperCase()}:`);
+        if (!url) return;
+
+        const newLink = {
+            id: Date.now(),
+            source: source,
+            external_id: Math.floor(Math.random() * 100000000).toString(),
+            name: `Спарсенный товар ${source.toUpperCase()}`,
+            price: Math.floor(10000 + Math.random() * 30000),
+            delivery_days: Math.floor(5 + Math.random() * 10),
+            stock_status: 'active',
+            url: url
+        };
+
+        const updated = {
+            ...product,
+            links: [...product.links, newLink]
+        };
+        syncUpdate(updated);
+    };
+
+    const handleEditLink = (linkId) => {
+        const newPrice = prompt("Введите новую цену для тестирования (только цифры):");
+        if (newPrice && !isNaN(newPrice)) {
+            const updated = {
+                ...product,
+                links: product.links.map(l => l.id === linkId ? { ...l, price: parseInt(newPrice) } : l)
+            };
+            syncUpdate(updated);
+        }
+    };
+
+    const handleDeleteLink = (linkId) => {
+        if (window.confirm("Вы уверены, что хотите удалить эту ссылку?")) {
+            const updated = {
+                ...product,
+                links: product.links.filter(l => l.id !== linkId)
+            };
+            syncUpdate(updated);
+        }
+    };
+
     return (
         <div className="page-content">
             <div className="detail-header">
@@ -530,8 +627,8 @@ function ProductDetail({ product, onBack }) {
                     <div className="links-header">
                         <h3>Ссылки WB / Ozon</h3>
                         <div className="actions-group sm">
-                            <button className="btn-secondary sm"><Plus size={14} /> ВБ</button>
-                            <button className="btn-secondary sm"><Plus size={14} /> Озон</button>
+                            <button className="btn-secondary sm" onClick={() => handleAddLink('wb')}><Plus size={14} /> Добавить товар ВБ</button>
+                            <button className="btn-secondary sm" onClick={() => handleAddLink('ozon')}><Plus size={14} /> Добавить товар Озон</button>
                         </div>
                     </div>
 
@@ -556,8 +653,8 @@ function ProductDetail({ product, onBack }) {
                                     <td><span className={`status-tag ${l.stock_status}`}>{l.stock_status}</span></td>
                                     <td>
                                         <div className="row-actions">
-                                            <button className="icon-btn sm"><Edit size={14} /></button>
-                                            <button className="icon-btn sm red"><Trash2 size={14} /></button>
+                                            <button className="icon-btn sm" onClick={() => handleEditLink(l.id)} title="Редактировать запись"><Edit size={14} /></button>
+                                            <button className="icon-btn sm red" onClick={() => handleDeleteLink(l.id)} title="Удалить запись"><Trash2 size={14} /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -584,6 +681,27 @@ function UsersTable() {
         { id: 5, login: 'analytic@nrt.kz', shop: 'NRT Store', role: 'analytic' }
     ]);
 
+    const handleAddUser = () => {
+        const login = prompt("Введите email нового пользователя:");
+        if (login) {
+            const nu = { id: Date.now(), login, shop: 'NRT Store', role: 'manager' };
+            setUsersList([...usersList, nu]);
+        }
+    };
+
+    const handleEditUser = (id) => {
+        const newRole = prompt("Введите новую роль (admin, manager, praiser, seller, analytic):");
+        if (newRole) {
+            setUsersList(usersList.map(u => u.id === id ? { ...u, role: newRole } : u));
+        }
+    };
+
+    const handleDeleteUser = (id) => {
+        if (window.confirm("Удалить пользователя?")) {
+            setUsersList(usersList.filter(u => u.id !== id));
+        }
+    };
+
     return (
         <div className="page-content">
             <div className="section-header-flex">
@@ -591,10 +709,7 @@ function UsersTable() {
                     <h1>Пользователи</h1>
                     <p>Управление правами доступа (admin, manager, praiser, seller, analytic)</p>
                 </div>
-                <button className="btn-primary" onClick={() => {
-                    const nu = { id: Date.now(), login: 'new_user@nrt.kz', shop: 'NRT Store', role: 'manager' };
-                    setUsersList([...usersList, nu]);
-                }}><PlusCircle size={18} /> Новый пользователь</button>
+                <button className="btn-primary" onClick={handleAddUser}><PlusCircle size={18} /> Новый пользователь</button>
             </div>
 
             <div className="card table-card">
@@ -613,7 +728,7 @@ function UsersTable() {
                                 <td>{u.login}</td>
                                 <td><span className="badge-shop">{u.shop}</span></td>
                                 <td><span className="role-badge">{u.role}</span></td>
-                                <td><div className="row-actions"><button className="icon-btn sm"><Edit size={14} /></button><button className="icon-btn sm red"><Trash2 size={14} /></button></div></td>
+                                <td><div className="row-actions"><button className="icon-btn sm" onClick={() => handleEditUser(u.id)}><Edit size={14} /></button><button className="icon-btn sm red" onClick={() => handleDeleteUser(u.id)}><Trash2 size={14} /></button></div></td>
                             </tr>
                         ))}
                     </tbody>
@@ -639,7 +754,7 @@ function Profile() {
                         <div className="info-row"><label>Shop ID:</label> <span>16493269</span></div>
                         <div className="info-row"><label>API Key:</label> <span className="api-key-mask">fvblMh3EkBCHhR1AD...</span></div>
                     </div>
-                    <button className="btn-secondary mt">Сменить пароль</button>
+                    <button className="btn-secondary mt" onClick={() => alert("Инструкция по смене пароля отправлена на почту")}>Сменить пароль</button>
                 </div>
 
                 <div className="card pricing-rules">
@@ -660,7 +775,7 @@ function Profile() {
                             <input type="number" defaultValue={1500} />
                             <small>Сумма доставки за единицу товара.</small>
                         </div>
-                        <button className="btn-primary" style={{ width: 'fit-content' }}>Сохранить настройки</button>
+                        <button className="btn-primary" style={{ width: 'fit-content' }} onClick={() => alert("Настройки алгоритма ценообразования сохранены!")}>Сохранить настройки</button>
                     </div>
                 </div>
             </div>

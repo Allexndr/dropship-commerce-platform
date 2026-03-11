@@ -66,8 +66,8 @@ export default function App() {
             switch (activeTab) {
                 case 'dashboard': return <Dashboard />;
                 case 'products': return <Products onEdit={setEditingProduct} />;
-                case 'shop': return <Placeholder title="Магазин" icon={<ShoppingBag size={48} />} />;
-                case 'analytics': return <Placeholder title="Аналитика" icon={<BarChart3 size={48} />} />;
+                case 'shop': return <Shop />;
+                case 'analytics': return <Analytics />;
                 case 'users': return <UsersTable />;
                 case 'profile': return <Profile />;
                 default:
@@ -319,6 +319,12 @@ function Products({ onEdit }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Filter states
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedBrand, setSelectedBrand] = useState('Все бренды');
+    const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+    const [linksFilter, setLinksFilter] = useState('Все');
+
     React.useEffect(() => {
         fetchProducts();
     }, []);
@@ -423,6 +429,29 @@ function Products({ onEdit }) {
         onEdit(updatedProduct); // Keep the editing view updated with the parent if necessary
     };
 
+    // Unified filter logic
+    const filteredProducts = products.filter(p => {
+        // Search filter
+        const matchesSearch = searchQuery === '' ||
+            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.sku.includes(searchQuery);
+
+        // Brand filter
+        const matchesBrand = selectedBrand === 'Все бренды' || p.brand === selectedBrand;
+
+        // Price filter
+        const price = p.calculated_price || p.kaspi_price || 0;
+        const matchesPriceMin = priceRange.min === '' || price >= parseInt(priceRange.min);
+        const matchesPriceMax = priceRange.max === '' || price <= parseInt(priceRange.max);
+
+        // Links filter
+        const matchesLinks = linksFilter === 'Все' ||
+            (linksFilter === 'С ссылками' && p.links && p.links.length > 0) ||
+            (linksFilter === 'Без ссылок' && (!p.links || p.links.length === 0));
+
+        return matchesSearch && matchesBrand && matchesPriceMin && matchesPriceMax && matchesLinks;
+    });
+
     return (
         <div className="page-content">
             <div className="section-header-flex">
@@ -451,20 +480,37 @@ function Products({ onEdit }) {
                 <div className="filters">
                     <div className="filter-item">
                         <label>Бренд</label>
-                        <select><option>Все бренды</option><option>Apple</option><option>Sony</option><option>Tuvio</option></select>
+                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
+                            <option>Все бренды</option>
+                            {[...new Set(products.map(p => p.brand))].filter(Boolean).map(b => (
+                                <option key={b}>{b}</option>
+                            ))}
+                        </select>
                     </div>
                     <div className="filter-item">
                         <label>Цена</label>
-                        <input type="text" placeholder="От - До" />
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                            <input type="number" placeholder="От" value={priceRange.min} onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })} style={{ width: '80px' }} />
+                            <input type="number" placeholder="До" value={priceRange.max} onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })} style={{ width: '80px' }} />
+                        </div>
                     </div>
                     <div className="filter-item">
                         <label>Ссылки</label>
-                        <select><option>Все</option><option>С ссылками</option><option>Без ссылок</option></select>
+                        <select value={linksFilter} onChange={(e) => setLinksFilter(e.target.value)}>
+                            <option>Все</option>
+                            <option>С ссылками</option>
+                            <option>Без ссылок</option>
+                        </select>
                     </div>
                 </div>
                 <div className="search-box">
                     <Search size={18} />
-                    <input type="text" placeholder="Поиск по названию или SKU..." />
+                    <input
+                        type="text"
+                        placeholder="Поиск по названию или SKU..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
                 </div>
             </div>
 
@@ -498,10 +544,10 @@ function Products({ onEdit }) {
                     <tbody>
                         {loading && <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>Загрузка товаров из базы...</td></tr>}
                         {error && <tr><td colSpan="9" style={{ textAlign: 'center', color: 'red', padding: '20px' }}>{error}</td></tr>}
-                        {!loading && !error && products.length === 0 && (
-                            <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>Товаров пока нет. Добавьте первый тестовый товар.</td></tr>
+                        {!loading && !error && filteredProducts.length === 0 && (
+                            <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>Товаров не найдено или список пуст.</td></tr>
                         )}
-                        {!loading && !error && products.map(p => {
+                        {!loading && !error && filteredProducts.map(p => {
                             // Highlighting Logic
                             let rowClass = "row-base";
                             if (!p.links || p.links.length === 0) {
@@ -783,12 +829,76 @@ function Profile() {
     );
 }
 
-function Placeholder({ title, icon }) {
+function Analytics() {
     return (
-        <div className="page-content empty-state">
-            {icon}
-            <h2>{title}</h2>
-            <p>Раздел находится в разработке</p>
+        <div className="page-content">
+            <div className="section-header">
+                <h1>Аналитика</h1>
+                <p>Статистика продаж и мониторинг цен</p>
+            </div>
+            <div className="analytics-grid">
+                <div className="card stat-card">
+                    <div className="stat-label">Всего товаров</div>
+                    <div className="stat-value">1,248</div>
+                    <div className="stat-trend up">+12% с прошлого месяца</div>
+                </div>
+                <div className="card stat-card">
+                    <div className="stat-label">Продажи (7 дней)</div>
+                    <div className="stat-value">5.2 млн ₸</div>
+                    <div className="stat-trend up">+5.4%</div>
+                </div>
+                <div className="card stat-card">
+                    <div className="stat-label">Конкурентоспособность</div>
+                    <div className="stat-value">94%</div>
+                    <div className="stat-trend up">Топ в категории</div>
+                </div>
+            </div>
+
+            <div className="card chart-card mt">
+                <h3>Динамика цен (Пример)</h3>
+                <div className="mock-chart">
+                    {[65, 59, 80, 81, 56, 55, 40, 70, 90, 85].map((val, i) => (
+                        <div key={i} className="chart-bar" style={{ height: `${val}%` }} title={`${val}%`}></div>
+                    ))}
+                </div>
+                <div className="chart-labels">
+                    <span>Янв</span><span>Фев</span><span>Мар</span><span>Апр</span><span>Май</span><span>Июн</span><span>Июл</span><span>Авг</span><span>Сен</span><span>Окт</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function Shop() {
+    return (
+        <div className="page-content">
+            <div className="section-header">
+                <h1>Магазин</h1>
+                <p>Настройки интеграции с маркетплейсом Kaspi</p>
+            </div>
+            <div className="shop-settings-grid">
+                <div className="card">
+                    <h3>Подключение API</h3>
+                    <div className="form-group mt">
+                        <label>Kaspi Merchant Token</label>
+                        <input type="password" value="********-****-****-****-************" readOnly />
+                        <button className="btn-secondary sm mt">Обновить токен</button>
+                    </div>
+                </div>
+                <div className="card">
+                    <h3>Статус магазина</h3>
+                    <div className="status-box mt">
+                        <div className="status-item">
+                            <span className="dot ok"></span>
+                            <strong>Kaspi API:</strong> Соединение установлено
+                        </div>
+                        <div className="status-item mt">
+                            <span className="dot ok"></span>
+                            <strong>Каталог:</strong> 1,248 товаров синхронизировано
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

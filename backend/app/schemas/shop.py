@@ -4,13 +4,22 @@ from datetime import datetime
 
 class ShopBase(BaseModel):
     name: str
-    api_key: Optional[str] = None
-    percent_markup: float = 0.0
+    custom_shop_id: Optional[str] = None
+    kaspi_token: Optional[str] = None
+    percentage_rules: Optional[str] = "[]" # JSON string
+    delivery_price_rules: Optional[str] = "[]" # JSON string
     delivery_plus: int = 0
-    delivery_price: float = 0.0
 
 class ShopCreate(ShopBase):
     pass
+
+class ShopUpdate(BaseModel):
+    name: Optional[str] = None
+    custom_shop_id: Optional[str] = None
+    kaspi_token: Optional[str] = None
+    percentage_rules: Optional[str] = None
+    delivery_price_rules: Optional[str] = None
+    delivery_plus: Optional[int] = None
 
 class ShopResponse(ShopBase):
     id: int

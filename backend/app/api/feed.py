@@ -13,8 +13,7 @@ router = APIRouter()
 @router.post("/parse/trigger")
 def trigger_parsing():
     """
-    Manually trigger the background parsing for all active WB links.
-    Returns immediately while Celery handles the work.
+    Manually trigger the background parsing for all active links.
     """
     msg = trigger_all_active_links_update.delay()
     return {"status": "processing", "task_id": msg.id, "message": "Parsing jobs queued"}
@@ -23,55 +22,58 @@ def trigger_parsing():
 def generate_xml_feed(db: Session = Depends(get_db)):
     """
     Generates the Kaspi XML feed based on the database state.
-    Only includes active products with active WB links.
     """
-    # Create root element according to Kaspi specification
-    kaspi_catalog = Element("kaspi_catalog", date=datetime.now().strftime("%Y-%m-%d %H:%M"))
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    kaspi_catalog = Element("kaspi_catalog", date=now_str)
     
     company = SubElement(kaspi_catalog, "company")
-    company.text = "My Dropship Company"
+    company.text = "NRT Store"
     merchantid = SubElement(kaspi_catalog, "merchantid")
-    merchantid.text = "1234567" # Placeholder
+    merchantid.text = "16493269" # Merchant ID from ТЗ
     
     offers = SubElement(kaspi_catalog, "offers")
     
-    # Query all active products with their links
     db_products = db.query(Product).filter(Product.status == "active").all()
     
     for product in db_products:
-        # Calculate price and status based on linked WB products
-        # Logic: Find the link with the best (lowest) price that is in stock
-        active_links = [link for link in product.links if link.stock_status == "ok"]
+        # Business Logic from ТЗ
+        active_links = [l for l in product.links if l.price > 0 and l.stock_status == "active"]
         
         if not active_links:
-            # If no active links, skip this product or set availability=false
             continue
             
-        # For prototype, just take the first active link's data
-        # In a real scenario, this would apply pricing rules and find the highest margin/lowest delivery
-        best_link = active_links[0]
+        avg_price = sum(l.price for l in active_links) / len(active_links)
+        max_delivery = max(l.delivery_days for l in active_links)
         
+        # Default Settings
+        markup = 0.15
+        delivery_plus = 2
+        delivery_price = 1500
+        
+        if product.shop:
+            markup = product.shop.percent_markup / 100.0
+            delivery_plus = product.shop.delivery_plus
+            delivery_price = product.shop.delivery_price
+
+        final_price = int(avg_price + (avg_price * markup) + delivery_price)
+        final_delivery = max_delivery + delivery_plus
+
         offer = SubElement(offers, "offer", sku=product.sku)
         model = SubElement(offer, "model")
-        model.text = product.model
+        model.text = product.name or product.model
         brand = SubElement(offer, "brand")
         brand.text = product.brand or "Unknown"
         
-        # Calculate final Kaspi Price (Placeholder logic: WB Price * 1.5)
-        price_val = best_link.price * 1.5 if best_link.price > 0 else product.kaspi_price
-        
         price = SubElement(offer, "price")
-        price.text = str(int(price_val))
+        price.text = str(final_price)
         
-        avail = SubElement(offer, "availabilities")
-        avail_item = SubElement(avail, "availability", 
-                              available="yes", 
-                              storeId="PP1", # Placeholder store ID
-                              preOrder=str(best_link.delivery_days))
+        availabilities = SubElement(offer, "availabilities")
+        SubElement(availabilities, "availability", 
+                   available="yes", 
+                   storeId="PP1", 
+                   preOrder=str(final_delivery))
     
-    # Generate XML string and return as 'application/xml'
     xml_str = tostring(kaspi_catalog, encoding="utf-8").decode("utf-8")
-    # Add XML declaration
     final_xml = f'<?xml version="1.0" encoding="utf-8"?>\n{xml_str}'
     
     return Response(content=final_xml, media_type="application/xml")

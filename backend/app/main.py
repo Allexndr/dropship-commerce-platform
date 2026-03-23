@@ -37,12 +37,28 @@ async def seed_demo_data():
     db = SessionLocal()
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     try:
+        from app.models.shop import Shop
+        # Seed demo shop
+        demo_shop = db.query(Shop).filter(Shop.name == "NRT Store").first()
+        if not demo_shop:
+            demo_shop = Shop(
+                name="NRT Store",
+                custom_shop_id="16493269",
+                kaspi_token="fvblMh3EkBCHhR1AD...",
+                percentage_rules='[{"min": 0, "max": 1000000, "percent": 15}]',
+                delivery_price_rules='[{"min": 0, "max": 1000000, "price": 500}]',
+                delivery_plus=3
+            )
+            db.add(demo_shop)
+            db.commit()
+            db.refresh(demo_shop)
+
         # Seed demo user
         if db.query(User).count() == 0:
             demo_user = User(
                 email="admin@test.kz",
                 hashed_password=pwd_context.hash("admin123"),
-                shop_name="NRT Store",
+                shop_id=demo_shop.id,
                 is_active=True,
             )
             db.add(demo_user)

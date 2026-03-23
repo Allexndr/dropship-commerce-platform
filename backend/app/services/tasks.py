@@ -6,7 +6,8 @@ from app.models.wblink import WbLink
 from app.services.wb_parser import WBParser
 from datetime import datetime
 
-parser = WBParser(use_proxies=False) # Configurable in future
+# Initialize parser with proxy support enabled by default
+parser = WBParser(use_proxies=True)
 
 @celery_app.task(bind=True, max_retries=3)
 def update_wblink_data(self, link_id: int):
@@ -45,14 +46,36 @@ def update_wblink_data(self, link_id: int):
                     
                     # If product belongs to a shop, calculate final Kaspi price and delivery days
                     if product.shop:
-                        # DeliveryMID = DeliveryMP + DeliveryPLUS
-                        delivery_plus = product.shop.delivery_plus if product.shop.delivery_plus else 0
+                        import json
+                        shop = product.shop
+                        
+                        # Get DeliveryPLUS
+                        delivery_plus = shop.delivery_plus if shop.delivery_plus else 0
                         product.delivery_days = max_delivery_mp + delivery_plus
                         
-                        # Price = PriceMid + (PriceMid * ПРОЦЕНТ) + Delivery Price
-                        markup_percent = product.shop.percent_markup / 100.0 if product.shop.percent_markup else 0.0
-                        delivery_price = product.shop.delivery_price if product.shop.delivery_price else 0.0
+                        # Find PERCENT from rules
+                        markup_percent = 0.0
+                        try:
+                            perc_rules = json.loads(shop.percentage_rules or '[]')
+                            for rule in perc_rules:
+                                if rule['min'] <= product.mid_price <= rule['max']:
+                                    markup_percent = float(rule['percent']) / 100.0
+                                    break
+                        except Exception as e:
+                            print(f"Error parsing percentage rules: {e}")
+
+                        # Find Delivery Price from rules
+                        delivery_price = 0.0
+                        try:
+                            deliv_rules = json.loads(shop.delivery_price_rules or '[]')
+                            for rule in deliv_rules:
+                                if rule['min'] <= product.mid_price <= rule['max']:
+                                    delivery_price = float(rule['price'])
+                                    break
+                        except Exception as e:
+                            print(f"Error parsing delivery price rules: {e}")
                         
+                        # Price = PriceMid + (PriceMid * ПРОЦЕНТ) + Delivery Price
                         product.kaspi_price = product.mid_price + (product.mid_price * markup_percent) + delivery_price
                     else:
                         # Fallback if no shop assigned

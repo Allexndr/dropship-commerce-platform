@@ -34,6 +34,8 @@ export default function App() {
     const [editingProduct, setEditingProduct] = useState(null);
     const [userRole, setUserRole] = useState('admin');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isLiveMode, setIsLiveMode] = useState(false);
+    const [shopData, setShopData] = useState({ id: 1, name: 'NRT Store', api_key: '' });
 
     const navItems = [
         { id: 'dashboard', label: 'Главная', icon: <LayoutDashboard size={20} />, roles: ['admin', 'manager'] },
@@ -42,6 +44,7 @@ export default function App() {
         { id: 'analytics', label: 'Аналитика', icon: <BarChart3 size={20} />, roles: ['admin', 'manager', 'analytic'] },
         { id: 'users', label: 'Пользователи', icon: <Users size={20} />, roles: ['admin', 'manager'] },
         { id: 'profile', label: 'Профиль', icon: <User size={20} />, roles: ['admin', 'manager'] },
+        { id: 'orders', label: 'Заказы Kaspi', icon: <ShoppingBag size={20} />, roles: ['admin', 'manager', 'seller'] },
     ];
 
     const allowedTabs = navItems.filter(item => item.roles.includes(userRole));
@@ -70,6 +73,7 @@ export default function App() {
                 case 'analytics': return <Analytics />;
                 case 'users': return <UsersTable />;
                 case 'profile': return <Profile />;
+                case 'orders': return <Orders shopId={shopData.id} />;
                 default:
                     const firstTab = allowedTabs[0]?.id || 'dashboard';
                     return activeTab === firstTab ? <Dashboard /> : <Dashboard />; // Fallback
@@ -132,11 +136,9 @@ export default function App() {
                                 <Menu size={24} />
                             </button>
                             <div className="header-info">
-                                <h2 className="shop-name">NRT Store</h2>
-                                <div className="user-badge">
-                                    <div className="online-indicator"></div>
-                                    <span>{userRole.toUpperCase()}</span>
-                                </div>
+                                <h2 className="shop-name">{shopData.name}</h2>
+                                {isLiveMode && <div className="live-indicator">LIVE</div>}
+                                <UserMenu userRole={userRole} onLogout={() => setIsLogged(false)} />
                             </div>
                         </div>
                         <div className="header-actions">
@@ -196,8 +198,6 @@ function LoginPage({ onLogin }) {
         setEmail(role.email);
         setPassword('12345678');
         setSelectedRole(role.id);
-        // Optionally auto-login
-        // onLogin(role.id);
     };
 
     if (forgotMode) {
@@ -216,10 +216,10 @@ function LoginPage({ onLogin }) {
                     ) : (
                         <form className="login-form" onSubmit={handleForgot}>
                             <div className="form-group">
-                                <label>Email</label>
+                                <label>Логин Email</label>
                                 <input type="email" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
                             </div>
-                            <button type="submit" className="btn-primary full">Сбросить пароль</button>
+                            <button type="submit" className="btn-primary full">сброс пароля</button>
                             <button type="button" className="btn-link" onClick={() => setForgotMode(false)}>Вернуться ко входу</button>
                         </form>
                     )}
@@ -234,7 +234,7 @@ function LoginPage({ onLogin }) {
                 <div className="login-header">
                     <div className="logo-box lg">DS</div>
                     <h1>Дропшиппинг</h1>
-                    <p>Вход в систему управления</p>
+                    <p>Входная страница</p>
                 </div>
 
                 <div className="quick-login-section">
@@ -251,25 +251,94 @@ function LoginPage({ onLogin }) {
                             </button>
                         ))}
                     </div>
-                    <div className="credential-hint mt">
-                        <strong>Логин:</strong> <code>{roles.find(r => r.id === selectedRole)?.email}</code><br />
-                        <strong>Пароль:</strong> <code>12345678</code>
-                    </div>
                 </div>
 
                 <form className="login-form" onSubmit={(e) => { e.preventDefault(); onLogin(selectedRole); }}>
                     <div className="form-group">
-                        <label>Email</label>
+                        <label>Логин Email</label>
                         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
                     </div>
                     <div className="form-group">
                         <label>Пароль</label>
-                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
+                        <small>Пароль должен состоять минимум из 8 знаков.</small>
                     </div>
-                    <button type="submit" className="btn-primary full">Войти</button>
-                    <button type="button" className="btn-link" onClick={() => setForgotMode(true)}>Забыли пароль?</button>
+                    <button type="submit" className="btn-primary full">вход</button>
+                    <button type="button" className="btn-link" onClick={() => setForgotMode(true)}>забыли пароль</button>
                 </form>
             </div>
+        </div>
+    );
+}
+
+function UserMenu({ userRole, onLogout }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [changePasswordMode, setChangePasswordMode] = useState(false);
+    const [passwords, setPasswords] = useState({ old: '', new1: '', new2: '' });
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        if (passwords.new1 !== passwords.new2) {
+            alert("Пароли не совпадают!");
+            return;
+        }
+        if (passwords.new1.length < 8) {
+            alert("Пароль должен быть не менее 8 символов!");
+            return;
+        }
+
+        try {
+            await axios.post(`${API_BASE}/users/change-password`, {
+                old_password: passwords.old,
+                new_password: passwords.new1
+            });
+            alert("Пароль успешно изменен!");
+            setChangePasswordMode(false);
+            setPasswords({ old: '', new1: '', new2: '' });
+        } catch (err) {
+            alert("Ошибка при смене пароля. Проверьте старый пароль.");
+        }
+    };
+
+    return (
+        <div className="user-menu-wrapper">
+            <div className="user-login-trigger" onClick={() => setIsOpen(!isOpen)}>
+                {userRole.toUpperCase()} <ChevronDown size={14} />
+            </div>
+
+            {isOpen && (
+                <div className="user-dropdown-card glass">
+                    <button onClick={() => { setChangePasswordMode(true); setIsOpen(false); }}>сменить пароль</button>
+                    <hr />
+                    <button onClick={onLogout} className="text-red">Выход</button>
+                </div>
+            )}
+
+            {changePasswordMode && (
+                <div className="modal-overlay">
+                    <div className="modal-card glass">
+                        <h3>Сменить пароль</h3>
+                        <form onSubmit={handleChangePassword}>
+                            <div className="form-group">
+                                <label>Старый пароль</label>
+                                <input type="password" value={passwords.old} onChange={e => setPasswords({ ...passwords, old: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Новый пароль</label>
+                                <input type="password" value={passwords.new1} onChange={e => setPasswords({ ...passwords, new1: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Повторите новый пароль</label>
+                                <input type="password" value={passwords.new2} onChange={e => setPasswords({ ...passwords, new2: e.target.value })} required />
+                            </div>
+                            <div className="modal-actions">
+                                <button type="button" className="btn-secondary" onClick={() => setChangePasswordMode(false)}>Отмена</button>
+                                <button type="submit" className="btn-primary">сохранить</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -318,50 +387,81 @@ function Products({ onEdit }) {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [shopRules, setShopRules] = useState(null);
 
-    // Filter states
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedBrand, setSelectedBrand] = useState('Все бренды');
+    // Filter states based on wireframe
+    const [selectedBrand, setSelectedBrand] = useState('SONY');
     const [priceRange, setPriceRange] = useState({ min: '', max: '' });
-    const [linksFilter, setLinksFilter] = useState('Все');
+    const [deliveryRange, setDeliveryRange] = useState({ min: '', max: '' });
+    const [withoutLinks, setWithoutLinks] = useState(false);
+    const [withLinks, setWithLinks] = useState(true);
+    const [appliedFilters, setAppliedFilters] = useState({
+        brand: 'SONY',
+        price: { min: '', max: '' },
+        delivery: { min: '', max: '' },
+        withoutLinks: false,
+        withLinks: true
+    });
 
     React.useEffect(() => {
-        fetchProducts();
+        fetchEverything();
     }, []);
 
-    const fetchProducts = async () => {
+    const fetchEverything = async () => {
         setLoading(true);
         try {
+            // 1. Fetch Shop Rules
+            let rules = { percentage_rules: [], delivery_price_rules: [], delivery_plus: 0 };
+            try {
+                const shopRes = await axios.get(`${API_BASE}/shops/me`);
+                rules = {
+                    ...shopRes.data,
+                    percentage_rules: JSON.parse(shopRes.data.percentage_rules || '[]'),
+                    delivery_price_rules: JSON.parse(shopRes.data.delivery_price_rules || '[]')
+                };
+            } catch (e) {
+                console.warn('Using default shop rules');
+                rules = {
+                    percentage_rules: [
+                        { min: 0, max: 3000, percent: 110 },
+                        { min: 3001, max: 5000, percent: 100 },
+                        { min: 5001, max: 10000, percent: 90 },
+                        { min: 10001, max: 2000000, percent: 80 }
+                    ],
+                    delivery_price_rules: [
+                        { min: 0, max: 3000, price: 175 },
+                        { min: 3001, max: 1000000, price: 500 }
+                    ],
+                    delivery_plus: 3
+                };
+            }
+            setShopRules(rules);
+
+            // 2. Fetch Products
             const response = await axios.get(`${API_BASE}/products/`);
-            setProducts(response.data);
-            setError(null);
-        } catch (err) {
-            // Fallback to mock data with ТЗ pricing formulas applied
-            console.warn('API unreachable, loading mock data:', err.message);
-            const enriched = mockProducts.map(p => {
-                // Calculate Price Mid from active links
+            const data = response.data;
+            
+            const processed = data.map(p => {
                 const activeLinks = (p.links || []).filter(l => l.stock_status === 'active' && l.price > 0);
                 const priceMid = activeLinks.length > 0
                     ? Math.round(activeLinks.reduce((sum, l) => sum + l.price, 0) / activeLinks.length)
                     : 0;
 
-                // DeliveryMID = DeliveryMP (min delivery from cheapest link) + DeliveryPLUS
-                const minDeliveryLink = activeLinks.length > 0
-                    ? activeLinks.reduce((min, l) => l.price < min.price ? l : min, activeLinks[0])
-                    : null;
-                const deliveryMid = minDeliveryLink
-                    ? minDeliveryLink.delivery_days + DELIVERY_PLUS
+                const maxDeliveryMP = activeLinks.length > 0
+                    ? Math.max(...activeLinks.map(l => l.delivery_days))
                     : 0;
+                
+                const deliveryMid = priceMid > 0 ? maxDeliveryMP + rules.delivery_plus : 0;
 
-                // Find pricing % from pricingRules
-                const rule = pricingRules.find(r => priceMid >= r.min && priceMid <= r.max);
-                const percent = rule ? rule.percent : 0;
+                // Apply rules
+                let percent = 0;
+                const pRule = rules.percentage_rules.find(r => priceMid >= r.min && priceMid <= r.max);
+                if (pRule) percent = pRule.percent;
 
-                // Find delivery price from deliveryPrices
-                const dRule = deliveryPrices.find(r => priceMid >= r.min && priceMid <= r.max);
-                const deliveryPrice = dRule ? dRule.price : 0;
+                let deliveryPrice = 0;
+                const dRule = rules.delivery_price_rules.find(r => priceMid >= r.min && priceMid <= r.max);
+                if (dRule) deliveryPrice = dRule.price;
 
-                // Price = PriceMid + (PriceMid * % / 100) + DeliveryPrice
                 const finalPrice = priceMid > 0
                     ? Math.round(priceMid + (priceMid * percent / 100) + deliveryPrice)
                     : p.kaspi_price || 0;
@@ -373,52 +473,32 @@ function Products({ onEdit }) {
                     calculated_price: finalPrice
                 };
             });
-            setProducts(enriched);
+            
+            setProducts(processed);
             setError(null);
+        } catch (err) {
+            console.error('Fetch products error:', err);
+            setError('Ошибка загрузки данных');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAddTestProduct = async () => {
-        const url = prompt("Введите ссылку на товар Kaspi:");
-        if (!url) return;
-
-        try {
-            // Mock parsing the URL... Delay to simulate work.
-            setLoading(true);
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            const newSku = Math.floor(1000000 + Math.random() * 9000000).toString();
-            const newProduct = {
-                sku: newSku,
-                name: "Спарсенный товар (Тест) " + newSku,
-                brand: "KaspiBrand",
-                kaspi_price: Math.floor(10000 + Math.random() * 50000),
-                mid_price: 0,
-                delivery_days: 0,
-                stock: 0,
-                links: [],
-                kaspi_link: url,
-                calculated_price: 0
-            };
-            // Kaspi price only since no links yet
-            newProduct.calculated_price = newProduct.kaspi_price;
-
-            setProducts(prev => [newProduct, ...prev]);
-        } catch (err) {
-            alert('Ошибка добавления: ' + err.message);
-        } finally {
-            setLoading(false);
-        }
+    const handleApplyFilters = () => {
+        setAppliedFilters({
+            brand: selectedBrand,
+            price: { ...priceRange },
+            delivery: { ...deliveryRange },
+            withoutLinks,
+            withLinks
+        });
     };
 
     const handleAction = async (actionName) => {
         setLoading(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            alert(`Успешно выполнено: ${actionName}`);
-            // In a real app we would call fetchProducts() here
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            alert(`Выполнено: ${actionName}`);
         } finally {
             setLoading(false);
         }
@@ -426,164 +506,123 @@ function Products({ onEdit }) {
 
     const handleUpdateProduct = (updatedProduct) => {
         setProducts(prev => prev.map(p => p.sku === updatedProduct.sku ? updatedProduct : p));
-        onEdit(updatedProduct); // Keep the editing view updated with the parent if necessary
     };
 
-    // Unified filter logic
     const filteredProducts = products.filter(p => {
-        // Search filter
-        const matchesSearch = searchQuery === '' ||
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.sku.includes(searchQuery);
-
-        // Brand filter
-        const matchesBrand = selectedBrand === 'Все бренды' || p.brand === selectedBrand;
-
-        // Price filter
+        const matchesBrand = appliedFilters.brand === 'Все бренды' || p.brand === appliedFilters.brand;
+        
         const price = p.calculated_price || p.kaspi_price || 0;
-        const matchesPriceMin = priceRange.min === '' || price >= parseInt(priceRange.min);
-        const matchesPriceMax = priceRange.max === '' || price <= parseInt(priceRange.max);
+        const matchesPriceMin = appliedFilters.price.min === '' || price >= parseInt(appliedFilters.price.min);
+        const matchesPriceMax = appliedFilters.price.max === '' || price <= parseInt(appliedFilters.price.max);
 
-        // Links filter
-        const matchesLinks = linksFilter === 'Все' ||
-            (linksFilter === 'С ссылками' && p.links && p.links.length > 0) ||
-            (linksFilter === 'Без ссылок' && (!p.links || p.links.length === 0));
+        const delivery = p.delivery_days || 0;
+        const matchesDelivMin = appliedFilters.delivery.min === '' || delivery >= parseInt(appliedFilters.delivery.min);
+        const matchesDelivMax = appliedFilters.delivery.max === '' || delivery <= parseInt(appliedFilters.delivery.max);
 
-        return matchesSearch && matchesBrand && matchesPriceMin && matchesPriceMax && matchesLinks;
+        const hasLinks = p.links && p.links.length > 0;
+        let matchesLinks = true;
+        if (appliedFilters.withoutLinks && appliedFilters.withLinks) matchesLinks = true;
+        else if (appliedFilters.withoutLinks) matchesLinks = !hasLinks;
+        else if (appliedFilters.withLinks) matchesLinks = hasLinks;
+
+        return matchesBrand && matchesPriceMin && matchesPriceMax && matchesDelivMin && matchesDelivMax && matchesLinks;
     });
 
     return (
         <div className="page-content">
-            <div className="section-header-flex">
-                <div>
-                    <h1>Товары</h1>
-                    <p>Управление прайс-листом и ценообразованием</p>
-                </div>
-                <div className="actions-group">
-                    <button className="btn-primary" onClick={handleAddTestProduct}><PlusCircle size={18} /> Добавить товар по ссылке</button>
-                    <button className="btn-secondary" onClick={() => {
-                        const err = document.getElementById('import-error');
-                        if (err) err.style.display = err.style.display === 'none' ? 'block' : 'none';
-                    }}>
-                        <Upload size={18} /> Импорт EXCEL
-                    </button>
-                    <button className="btn-secondary" onClick={() => alert('Началась загрузка шаблона...')}>
-                        <Download size={18} /> Скачать шаблон EXCEL
-                    </button>
-                    <button className="btn-secondary" onClick={() => handleAction('Обновление цен Kaspi')}><RefreshCcw size={18} /> Обновить Каспи</button>
-                    <button className="btn-secondary" onClick={() => handleAction('Обновление цен и сроков WB/Ozon')}><RefreshCcw size={18} /> Обновить цены</button>
-                    <button className="btn-secondary" onClick={() => handleAction('Полное обновление всех данных')}><RefreshCcw size={18} /> Обновить ВСЕ</button>
-                </div>
+            <div className="products-toolbar">
+                <button className="btn-secondary" onClick={() => alert('Добавление товара...')}>Добавить товар</button>
+                <button className="btn-secondary" onClick={() => alert('Импорт...')}>Импорт EXCEL</button>
+                <button className="btn-secondary" onClick={() => alert('Скачивание...')}>Скачать EXCEL</button>
+                <button className="btn-secondary" onClick={() => handleAction('Обновить КАСПИ')}>Обновить КАСПИ</button>
+                <button className="btn-secondary" onClick={() => handleAction('Обновить ЦЕНЫ')}>Обновить ЦЕНЫ</button>
+                <button className="btn-secondary" onClick={() => handleAction('Обновить ВСЕ')}>Обновить ВСЕ</button>
             </div>
 
-            <div className="toolbar card">
-                <div className="filters">
-                    <div className="filter-item">
-                        <label>Бренд</label>
+            <div className="products-layout cards-gap">
+                <div className="filter-section-vertical card mini">
+                    <div className="vertical-filter-item">
+                        <label>ВЫБРАТЬ БРЕНД</label>
                         <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
                             <option>Все бренды</option>
-                            {[...new Set(products.map(p => p.brand))].filter(Boolean).map(b => (
+                            <option>SONY</option>
+                            {[...new Set(products.map(p => p.brand))].filter(b => b && b !== 'SONY').map(b => (
                                 <option key={b}>{b}</option>
                             ))}
                         </select>
                     </div>
-                    <div className="filter-item">
-                        <label>Цена</label>
-                        <div style={{ display: 'flex', gap: '5px' }}>
-                            <input type="number" placeholder="От" value={priceRange.min} onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })} style={{ width: '80px' }} />
-                            <input type="number" placeholder="До" value={priceRange.max} onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })} style={{ width: '80px' }} />
+
+                    <div className="vertical-filter-item">
+                        <label>ВЫБРАТЬ ДИАПАЗОН ЦЕН</label>
+                        <div className="price-range-inputs">
+                            <span className="range-label">от</span>
+                            <input type="number" value={priceRange.min} onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })} />
+                            <span className="range-label">до</span>
+                            <input type="number" value={priceRange.max} onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })} />
                         </div>
                     </div>
-                    <div className="filter-item">
-                        <label>Ссылки</label>
-                        <select value={linksFilter} onChange={(e) => setLinksFilter(e.target.value)}>
-                            <option>Все</option>
-                            <option>С ссылками</option>
-                            <option>Без ссылок</option>
-                        </select>
+
+                    <div className="vertical-filter-item">
+                        <label>ВЫБРАТЬ ДИАПАЗОН ДОСТАВКИ</label>
+                        <div className="delivery-range-inputs">
+                            <span className="range-label">от</span>
+                            <input type="number" value={deliveryRange.min} onChange={(e) => setDeliveryRange({ ...deliveryRange, min: e.target.value })} />
+                            <span className="range-label">до</span>
+                            <input type="number" value={deliveryRange.max} onChange={(e) => setDeliveryRange({ ...deliveryRange, max: e.target.value })} />
+                        </div>
                     </div>
-                </div>
-                <div className="search-box">
-                    <Search size={18} />
-                    <input
-                        type="text"
-                        placeholder="Поиск по названию или SKU..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
-            </div>
 
-            {/* Excel Import Simulation Error */}
-            <div className="import-status-box" style={{ marginBottom: '1rem', display: 'none' }} id="import-error">
-                <div className="alert-error">
-                    <AlertCircle size={18} />
-                    <div>
-                        <strong>Ошибка импорта:</strong> Весь файл отклонен. Исправьте ошибки:<br />
-                        • строка 57: ссылка не правильная (КАСПИ)<br />
-                        • строка 98: повтор SKU (уже существует)
+                    <div className="checkbox-filter-item">
+                        <label>ВЫБРАТЬ ТОВАРЫ БЕЗ ССЫЛОК</label>
+                        <input type="checkbox" checked={withoutLinks} onChange={(e) => setWithoutLinks(e.target.checked)} />
                     </div>
+
+                    <div className="checkbox-filter-item">
+                        <label>ВЫБРАТЬ ТОВАРЫ С ССЫЛКАМИ</label>
+                        <input type="checkbox" checked={withLinks} onChange={(e) => setWithLinks(e.target.checked)} />
+                    </div>
+
+                    <button className="btn-apply-filters" onClick={handleApplyFilters}>Применить</button>
                 </div>
-            </div>
 
-            <div className="card table-card overflow-x">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>SKU</th>
-                            <th>Наименование</th>
-                            <th>Бренд</th>
-                            <th>Цена (=Price)</th>
-                            <th>Price Kaspi</th>
-                            <th>Price MID</th>
-                            <th>Доставка (DeliveryMID)</th>
-                            <th>Кол-во (stock)</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading && <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>Загрузка товаров из базы...</td></tr>}
-                        {error && <tr><td colSpan="9" style={{ textAlign: 'center', color: 'red', padding: '20px' }}>{error}</td></tr>}
-                        {!loading && !error && filteredProducts.length === 0 && (
-                            <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>Товаров не найдено или список пуст.</td></tr>
-                        )}
-                        {!loading && !error && filteredProducts.map(p => {
-                            // Highlighting Logic
-                            let rowClass = "row-base";
-                            if (!p.links || p.links.length === 0) {
-                                rowClass = "row-red"; // No links
-                            } else {
-                                const hasError = p.links.some(l => l.stock_status === 'error' || l.price === 0);
-                                if (hasError) {
-                                    rowClass = "row-yellow"; // Has errors
-                                }
-                            }
-
-                            const isOverLimit = p.delivery_days > 30; // Just as an example limit alert
-
-                            return (
-                                <tr key={p.sku} className={`${rowClass} ${isOverLimit ? 'over-limit-row' : ''} `} onDoubleClick={() => onEdit(p)}>
+                <div className="card table-card overflow-x">
+                    <table className="data-table mt-0">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>model</th>
+                                <th>brand</th>
+                                <th>Price kaspi</th>
+                                <th>Price mid</th>
+                                <th>Delivery mid</th>
+                                <th>quantity</th>
+                                <th style={{ width: '80px' }}>edit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading && <tr><td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>Загрузка товаров...</td></tr>}
+                            {!loading && filteredProducts.map(p => (
+                                <tr key={p.sku} onDoubleClick={() => onEdit(p, handleUpdateProduct)}>
                                     <td><code className="sku">{p.sku}</code></td>
-                                    <td>
-                                        <div className="model-name">{p.name}</div>
-                                        {isOverLimit && <div className="error-badge-inline"><AlertCircle size={12} /> Превышен лимит (30 дн.)</div>}
-                                    </td>
-                                    <td>{p.brand || '-'}</td>
-                                    <td><strong>{(p.calculated_price || p.kaspi_price || 0).toLocaleString()} ₸</strong></td>
-                                    <td>{(p.kaspi_price || 0).toLocaleString()} ₸</td>
-                                    <td>{(p.mid_price || 0).toLocaleString()} ₸</td>
-                                    <td>{p.delivery_days} дн.</td>
+                                    <td>{p.name}</td>
+                                    <td>{p.brand}</td>
+                                    <td>{(p.calculated_price || p.kaspi_price).toLocaleString()}</td>
+                                    <td>{(p.mid_price || 0).toLocaleString()}</td>
+                                    <td>{p.delivery_days}</td>
                                     <td>{p.stock}</td>
                                     <td>
-                                        <button className="edit-row-btn" onClick={() => onEdit(p, handleUpdateProduct)} title="Редактировать">
-                                            <Edit size={16} />
+                                        <button className="icon-btn sm" onClick={() => onEdit(p, handleUpdateProduct)}>
+                                            <Edit size={14} />
                                         </button>
                                     </td>
                                 </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                            ))}
+                            {!loading && filteredProducts.length === 0 && (
+                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>Товары не найдены</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
@@ -592,7 +631,6 @@ function Products({ onEdit }) {
 function ProductDetail({ product: initialProduct, onBack, onUpdate }) {
     const [product, setProduct] = useState(initialProduct);
 
-    // Sync changes back when they happen
     const syncUpdate = (updatedProduct) => {
         setProduct(updatedProduct);
         if (onUpdate) onUpdate(updatedProduct);
@@ -645,73 +683,82 @@ function ProductDetail({ product: initialProduct, onBack, onUpdate }) {
         <div className="page-content">
             <div className="detail-header">
                 <button className="btn-link" onClick={onBack}>&larr; Назад к списку</button>
-                <h1>Карточка товара</h1>
             </div>
 
-            <div className="detail-grid">
-                <div className="card detail-info-card">
-                    <h3>Данные Kaspi (Read-only)</h3>
-                    <div className="info-grid">
-                        <div className="info-item"><label>SKU</label><span>{product.sku || '-'}</span></div>
-                        <div className="info-item"><label>Бренд</label><span>{product.brand || '-'}</span></div>
-                        <div className="info-item"><label>Наименование</label><span>{product.name || '-'}</span></div>
-                        <div className="info-item">
-                            <label>Мин. цена Kaspi</label>
-                            <span className="price-tag">{(product.kaspi_price || 0).toLocaleString()} ₸</span>
-                        </div>
-                    </div>
-                    <div className="external-link-box">
-                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Ссылка Kaspi:</label>
-                        <div className="readonly-input">
-                            <input type="text" value={product.kaspi_link || 'https://kaspi.kz/shop/p/...'} readOnly />
-                            <a href={product.kaspi_link || '#'} target="_blank" rel="noreferrer"><ExternalLink size={14} /></a>
-                        </div>
-                    </div>
-                </div>
+            <div className="detail-actions-top">
+                <button className="btn-outline-blue" onClick={() => handleAddLink('wb')}>Добавить товар ВБ</button>
+                <button className="btn-outline-blue" onClick={() => handleAddLink('ozon')}>Добавить товар ОЗОН</button>
+            </div>
 
-                <div className="card links-card">
-                    <div className="links-header">
-                        <h3>Ссылки WB / Ozon</h3>
-                        <div className="actions-group sm">
-                            <button className="btn-secondary sm" onClick={() => handleAddLink('wb')}><Plus size={14} /> Добавить товар ВБ</button>
-                            <button className="btn-secondary sm" onClick={() => handleAddLink('ozon')}><Plus size={14} /> Добавить товар Озон</button>
-                        </div>
-                    </div>
+            <table className="bordered-info-table">
+                <tbody>
+                    <tr>
+                        <td>SKU</td>
+                        <td>{product.sku || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td>Brand</td>
+                        <td>{product.brand || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td>Model</td>
+                        <td>{product.name || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td>PRICE KASPI</td>
+                        <td>{(product.kaspi_price || 0).toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                        <td>ССЫЛКА</td>
+                        <td>
+                            <a href={product.kaspi_link || '#'} target="_blank" rel="noreferrer" className="btn-link" style={{ wordBreak: 'break-all' }}>
+                                {product.kaspi_link || 'https://kaspi.kz/shop/p/...'}
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
 
-                    <table className="links-table">
-                        <thead>
-                            <tr>
-                                <th>Источник</th>
-                                <th>ID на MP</th>
-                                <th>Цена MP</th>
-                                <th>Срок</th>
-                                <th>Статус</th>
-                                <th>Действие</th>
+            <div className="card table-card overflow-x">
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>артикул</th>
+                            <th>Название</th>
+                            <th>Цена</th>
+                            <th>Доставка</th>
+                            <th>ссылка</th>
+                            <th style={{ width: '150px' }}>действие</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {product.links.length > 0 ? product.links.map(l => (
+                            <tr key={l.id}>
+                                <td>{l.external_id}</td>
+                                <td>{l.name}</td>
+                                <td>{l.price.toLocaleString()}</td>
+                                <td>{l.delivery_days}</td>
+                                <td>
+                                    <a href={l.url} target="_blank" rel="noreferrer" className="btn-link">Открыть</a>
+                                </td>
+                                <td>
+                                    <div className="row-actions">
+                                        <button className="icon-btn sm" onClick={() => handleEditLink(l.id)}>
+                                            <Edit size={14} />
+                                        </button>
+                                        <button className="btn-delete-link" onClick={() => handleDeleteLink(l.id)}>
+                                            <Trash2 size={14} /> Удалить
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {product.links.length > 0 ? product.links.map(l => (
-                                <tr key={l.id}>
-                                    <td><span className={`source-badge ${l.source}`}>{l.source.toUpperCase()}</span></td>
-                                    <td>{l.external_id}</td>
-                                    <td>{l.price.toLocaleString()} ₸</td>
-                                    <td>{l.delivery_days} дн.</td>
-                                    <td><span className={`status-tag ${l.stock_status}`}>{l.stock_status}</span></td>
-                                    <td>
-                                        <div className="row-actions">
-                                            <button className="icon-btn sm" onClick={() => handleEditLink(l.id)} title="Редактировать запись"><Edit size={14} /></button>
-                                            <button className="icon-btn sm red" onClick={() => handleDeleteLink(l.id)} title="Удалить запись"><Trash2 size={14} /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan="6" className="empty-row">Ссылок пока нет. Добавьте первую.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                        )) : (
+                            <tr>
+                                <td colSpan="6" className="empty-row text-center">Ссылок пока нет.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
@@ -785,45 +832,164 @@ function UsersTable() {
 }
 
 function Profile() {
+    const [shop, setShop] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    React.useEffect(() => {
+        fetchShop();
+    }, []);
+
+    const fetchShop = async () => {
+        try {
+            const res = await axios.get(`${API_BASE}/shops/me`);
+            // Parse JSON strings from backend into arrays
+            const data = { ...res.data };
+            data.percentage_rules = JSON.parse(data.percentage_rules || '[]');
+            data.delivery_price_rules = JSON.parse(data.delivery_price_rules || '[]');
+            setShop(data);
+        } catch (err) {
+            console.error('Fetch shop error:', err);
+            // Default mock data matching wireframe
+            setShop({
+                name: 'NRT Store',
+                custom_shop_id: '16493269',
+                kaspi_token: 'fvblMh3EkBCHhR1ADzSBnNbJdvhj6CjeEWhVPfXMFgY=',
+                percentage_rules: [
+                    { min: 0, max: 3000, percent: 110 },
+                    { min: 3001, max: 5000, percent: 100 },
+                    { min: 5001, max: 10000, percent: 90 },
+                    { min: 10001, max: 20000, percent: 85 },
+                    { min: 20001, max: 30000, percent: 80 },
+                    { min: 30001, max: 40000, percent: 75 },
+                    { min: 40001, max: 50000, percent: 70 },
+                    { min: 50001, max: 60000, percent: 65 },
+                    { min: 60001, max: 1000000, percent: 60 },
+                ],
+                delivery_price_rules: [
+                    { min: 0, max: 1000, price: 60 },
+                    { min: 1001, max: 3000, price: 175 },
+                    { min: 3001, max: 5000, price: 231 },
+                    { min: 5001, max: 10000, price: 927 },
+                    { min: 10001, max: 1000000, price: 1750 },
+                ],
+                delivery_plus: 3
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async (updatedShop) => {
+        setLoading(true);
+        try {
+            const payload = { ...updatedShop };
+            payload.percentage_rules = JSON.stringify(payload.percentage_rules);
+            payload.delivery_price_rules = JSON.stringify(payload.delivery_price_rules);
+            await axios.patch(`${API_BASE}/shops/me`, payload);
+            setShop(updatedShop);
+            alert("Настройки системы сохранены!");
+        } catch (err) {
+            alert("Ошибка сохранения настроек.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const editPercentRules = () => {
+        const json = prompt("Введите правила процентов в формате JSON (массив объектов):", JSON.stringify(shop.percentage_rules));
+        if (json) {
+            try {
+                const parsed = JSON.parse(json);
+                handleSave({ ...shop, percentage_rules: parsed });
+            } catch (e) { alert("Неверный формат JSON"); }
+        }
+    };
+
+    const editDeliveryPriceRules = () => {
+        const json = prompt("Введите правила цены доставки в формате JSON:", JSON.stringify(shop.delivery_price_rules));
+        if (json) {
+            try {
+                const parsed = JSON.parse(json);
+                handleSave({ ...shop, delivery_price_rules: parsed });
+            } catch (e) { alert("Неверный формат JSON"); }
+        }
+    };
+
+    const editDeliveryPlus = () => {
+        const val = prompt("Введите DeliveryPlus (дни):", shop.delivery_plus);
+        if (val !== null) {
+            handleSave({ ...shop, delivery_plus: parseInt(val) });
+        }
+    };
+
+    if (!shop || loading) return <div className="page-content">Загрузка профиля...</div>;
+
     return (
         <div className="page-content">
-            <div className="section-header">
-                <h1>Профиль магазина</h1>
-                <p>Настройки API и алгоритма ценообразования (по ТЗ)</p>
+            <table className="profile-info-table">
+                <tbody>
+                    <tr><td>Shop Name</td><td>{shop.name}</td></tr>
+                    <tr><td>Shop id</td><td>{shop.custom_shop_id || '-'}</td></tr>
+                    <tr><td>Shop api</td><td>{shop.kaspi_token || '-'}</td></tr>
+                </tbody>
+            </table>
+
+            <div className="detail-actions-top">
+                <button className="btn-outline-blue" onClick={editPercentRules}>редактировать процент</button>
+                <button className="btn-outline-blue" onClick={editDeliveryPlus}>редактировать DeliveryPlus</button>
+                <button className="btn-outline-blue" onClick={editDeliveryPriceRules}>редактировать DeliveryPrice</button>
             </div>
 
-            <div className="profile-grid">
-                <div className="card profile-info">
-                    <h3>Общие данные</h3>
-                    <div className="info-list">
-                        <div className="info-row"><label>Shop Name:</label> <span>NRT Store</span></div>
-                        <div className="info-row"><label>Shop ID:</label> <span>16493269</span></div>
-                        <div className="info-row"><label>API Key:</label> <span className="api-key-mask">fvblMh3EkBCHhR1AD...</span></div>
-                    </div>
-                    <button className="btn-secondary mt" onClick={() => alert("Инструкция по смене пароля отправлена на почту")}>Сменить пароль</button>
-                </div>
+            <div className="rule-section">
+                <div className="rule-section-title">ПРОЦЕНТ, указывается какой процент добавляется к цене себестоимости</div>
+                <table className="rules-table">
+                    <thead>
+                        <tr>
+                            <th>Sum min</th>
+                            <th>Sum max</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {shop.percentage_rules.map((r, i) => (
+                            <tr key={i}>
+                                <td>{r.min}</td>
+                                <td>{r.max}</td>
+                                <td>{r.percent}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
-                <div className="card pricing-rules">
-                    <h3>Ценообразование магазина</h3>
-                    <div className="rules-form">
-                        <div className="form-group">
-                            <label>ПРОЦЕНТ надбавки (%)</label>
-                            <input type="number" defaultValue={20} />
-                            <small>Процент, который добавляется к цене себестоимости.</small>
-                        </div>
-                        <div className="form-group">
-                            <label>Delivery PLUS (дни)</label>
-                            <input type="number" defaultValue={3} />
-                            <small>Дополнительное число к прибавлению к дате доставке.</small>
-                        </div>
-                        <div className="form-group">
-                            <label>Delivery Price (₸)</label>
-                            <input type="number" defaultValue={1500} />
-                            <small>Сумма доставки за единицу товара.</small>
-                        </div>
-                        <button className="btn-primary" style={{ width: 'fit-content' }} onClick={() => alert("Настройки алгоритма ценообразования сохранены!")}>Сохранить настройки</button>
-                    </div>
+            <div className="rule-section">
+                <div className="rule-section-title">DeliveryPLUS - дополнительное число к прибавлению к дате доставке.</div>
+                <div className="delivery-plus-box">
+                    <span>DeliveryPLUS</span>
+                    <strong>{shop.delivery_plus}</strong>
                 </div>
+            </div>
+
+            <div className="rule-section">
+                <div className="rule-section-title">Delivery Price, указывается сумма доставки.</div>
+                <table className="rules-table">
+                    <thead>
+                        <tr>
+                            <th>Sum min</th>
+                            <th>Sum max</th>
+                            <th>Delivery price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {shop.delivery_price_rules.map((r, i) => (
+                            <tr key={i}>
+                                <td>{r.min}</td>
+                                <td>{r.max}</td>
+                                <td>{r.price}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
@@ -869,6 +1035,79 @@ function Analytics() {
     );
 }
 
+function Orders({ shopId }) {
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchOrders = async () => {
+        setLoading(true);
+        try {
+            const res = await axios.get(`${API_BASE}/orders?shop_id=${shopId}`);
+            setOrders(res.data.orders);
+        } catch (e) {
+            console.error(e);
+            setOrders([
+                { id: '1', attributes: { code: 'ORDER-2024-001', creationDate: Date.now(), status: 'NEW', totalPrice: 45000 } },
+                { id: '2', attributes: { code: 'ORDER-2024-002', creationDate: Date.now() - 86400000, status: 'PICKUP', totalPrice: 12500 } }
+            ]);
+        }
+        setLoading(false);
+    };
+
+    React.useEffect(() => { fetchOrders(); }, [shopId]);
+
+    return (
+        <div className="page-content">
+            <div className="section-header-flex">
+                <div>
+                    <h1>Заказы Kaspi</h1>
+                    <p>Мониторинг и управление заказами в реальном времени</p>
+                </div>
+                <button className="btn-primary sm" onClick={fetchOrders}>
+                    <RefreshCcw size={16} /> Обновить
+                </button>
+            </div>
+
+            <div className="card table-card overflow-x">
+                {loading ? (
+                    <div className="empty-state">Загрузка данных...</div>
+                ) : (
+                    <table className="orders-table">
+                        <thead>
+                            <tr>
+                                <th>Номер заказа</th>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                                <th>Сумма</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {orders.length > 0 ? orders.map(order => (
+                                <tr key={order.id}>
+                                    <td><span className="order-code">{order.attributes.code}</span></td>
+                                    <td>{new Date(order.attributes.creationDate).toLocaleDateString()}</td>
+                                    <td>
+                                        <span className={`state-badge ${order.attributes.status.toLowerCase()}`}>
+                                            {order.attributes.status}
+                                        </span>
+                                    </td>
+                                    <td>{order.attributes.totalPrice.toLocaleString()} ₸</td>
+                                    <td>
+                                        <button className="btn-secondary sm">Детали</button>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr><td colSpan="5" className="empty-state" style={{ padding: '3rem' }}>Новых заказов нет</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function Shop() {
     return (
         <div className="page-content">
@@ -881,21 +1120,32 @@ function Shop() {
                     <h3>Подключение API</h3>
                     <div className="form-group mt">
                         <label>Kaspi Merchant Token</label>
-                        <input type="password" value="********-****-****-****-************" readOnly />
-                        <button className="btn-secondary sm mt">Обновить токен</button>
+                        <div className="readonly-input">
+                            <input type="password" value="********-****-****-****-************" readOnly />
+                            <button className="btn-link" onClick={() => {
+                                const token = prompt("Введите ваш Kaspi API Token:");
+                                if (token) alert("Токен сохранен! (Имитация)");
+                            }}>Изменить</button>
+                        </div>
+                        <p className="mt" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            Токен необходим для синхронизации заказов. Получите его в кабинете Kaspi Pay.
+                        </p>
                     </div>
                 </div>
                 <div className="card">
-                    <h3>Статус магазина</h3>
-                    <div className="status-box mt">
-                        <div className="status-item">
-                            <span className="dot ok"></span>
-                            <strong>Kaspi API:</strong> Соединение установлено
+                    <h3>XML Прайс-лист</h3>
+                    <div className="form-group mt">
+                        <label>Ссылка для Kaspi</label>
+                        <div className="readonly-input">
+                            <input type="text" value={`https://dropship-tan.vercel.app/api/v1/xml/feed`} readOnly />
+                            <button className="btn-link" onClick={() => {
+                                navigator.clipboard.writeText(`https://dropship-tan.vercel.app/api/v1/xml/feed`);
+                                alert("Ссылка скопирована!");
+                            }}><Copy size={16} /></button>
                         </div>
-                        <div className="status-item mt">
-                            <span className="dot ok"></span>
-                            <strong>Каталог:</strong> 1,248 товаров синхронизировано
-                        </div>
+                        <p className="mt" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            Укажите эту ссылку в настройках автозагрузки Kaspi.
+                        </p>
                     </div>
                 </div>
             </div>

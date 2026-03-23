@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 7 days
     
+    # List of proxies separated by comma
+    # Format: http://user:pass@host:port
+    WB_PROXY_LIST: str = os.getenv("WB_PROXY_LIST", "")
+    
     class Config:
         env_file = ".env"
 
